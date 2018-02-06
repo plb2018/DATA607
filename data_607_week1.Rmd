@@ -1,0 +1,106 @@
+---
+title: "Data 607 - Week 1"
+author: "Paul Britton"
+date: '2018-02-04'
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+The .rmd and raw data for this assignment can be found in my github repository located at [https://github.com/plb2018/DATA607](https://github.com/plb2018/DATA607). For the purposes of this exercise, i'm grabbing the data files directly from my github.
+
+The rpubs.com version of this work can be found at [http://rpubs.com/plb_lttfer/](https://github.com/plb2018/DATA607)
+
+
+The task here is to perform several manipulations of a mushroom data set so first, we'll get the data, grab the first few columns and take a look:
+
+###Load data
+
+```{r load_data, results='hide'}
+library(data.table)
+library(plyr)
+
+#load the data
+shrooms <- fread("https://github.com/plb2018/DATA607/raw/master/agaricus-lepiota.data")
+
+```
+
+###Downscope the data and inspect
+
+```{r downscope_data}
+
+#grab the first few columns 
+df <- data.frame(shrooms[,0:6])
+
+head(df,5)
+
+```
+
+
+
+###Name the columns
+
+The data looks good, so now we give the columns some names:
+
+```{r name_cols}
+#rename the columns
+names(df) <- c("edible_poisonous","cap_shape","cap_surface","cap_color","bruises","odor")
+
+head(df,5)
+
+```
+
+
+###Replace abbreviations
+
+The re-naming of the columns looks good, so now we'll replace the abbreviations with the appropriate names.  The source file for the names can be found [here](https://github.com/plb2018/DATA607/raw/master/agaricus-lepiota.names):
+
+```{r abbrv_to_names}
+
+df$edible_poisonous <- mapvalues(df$edible_poisonous,
+                                 from=c('e','p'),
+                                 to=c('edible','poisonous'))
+
+
+
+df$cap_shape <- mapvalues(df$cap_shape,
+                          from=c('b','c','x','f','k','s'),
+                          to=c('bell','conical','convex','flat','knobbed','sunken'))
+
+
+
+df$cap_surface <- mapvalues(df$cap_surface,
+                            from=c('f','g','y','s'),
+                            to=c('fibrous','grooves','scaly','smooth'))
+
+
+
+df$cap_color <- mapvalues(df$cap_color,
+                          from=c('n','b','c','g','r','p','u','e','w','y'),
+                          to=c('brown','buff','cinnamon','gray','green','pink','purple','red','white','yellow'))
+
+
+
+df$bruises <- mapvalues(df$bruises,
+                        from=c('t','f'), 
+                        to=c('bruises','no bruises'))
+
+
+
+df$odor <- mapvalues(df$odor,
+                     from=c('a','l','c','y','f','m','n','p','s'),
+                     to=c('almond','anise','creosote','fishy','foul','musty','none','pungent','spicy'))
+
+
+
+head(df,5)
+
+```
+
+We now have the first few columns of the dataframe with meaningful names, and all abbreviations replaced!
+
+
+
+
