@@ -1,0 +1,128 @@
+---
+title: "DATA 607 - WEEK 2"
+author: "Paul Britton"
+output:  
+  html_document:
+    theme: cerulean
+    highlight: pygments
+
+---
+
+My friends and family have probably had enough of me talking about data, so I decided to use a movie dataset that I found on the internet [here](https://grouplens.org/datasets/movielens/).  I've copied the data to my [github](https://github.com/plb2018/DATA607/tree/master/ml-latest-small) and reference that copy in my code.  
+
+I've opted to do all my MySQL work directly from R, so the only file that i have to show is a .rmd which can be found in my here in my github.  I've also included my output [here] (i.e. the joined table) in as a .csv in case anybody is interested.
+
+
+### Load Required Packages
+
+```{r results='hide'}
+library(RMySQL)
+library(data.table)
+
+```
+
+
+### Read in username and password from file
+
+```{r results='hide'}
+
+user_df <- read.table("mysql_temp_pw.csv",header=TRUE,sep=",")
+
+user = toString(user_df[1,"user"])
+pw = toString(user_df[1,"password"])
+
+```
+
+First we'll open a connection to MySQL. Note that I've pre-created a database called "DATA_607" using the following SQL command: CREATE DATABASE "DATA_607".
+
+```{r}
+con = dbConnect(MySQL(), user=user, password=pw, dbname='DATA_607', host='localhost')
+
+
+```
+
+
+Next we'll read the movie data into dataframes.  The data are contained in 3 separate files (links, ratings, movies) which we'll end up combining into a single db table later.  
+
+```{r}
+
+
+ratings <- read.table("https://raw.githubusercontent.com/plb2018/DATA607/master/ml-latest-small/ratings.csv",header = TRUE, sep = ",")
+
+movies <- read.table("https://raw.githubusercontent.com/plb2018/DATA607/master/ml-latest-small/movies.csv",header = TRUE, sep = ",",fill = TRUE)
+
+```
+
+And we'll take a look at the data:
+
+```{r}
+
+head(ratings,5)
+
+```
+
+```{r}
+
+head(movies,5)
+
+```
+
+
+The data look good, so now we'll load the data into individual tables in MySQL:
+
+
+```{r}
+dbWriteTable(con, name='ratings', value=ratings)
+dbWriteTable(con, name='movies', value=movies)
+
+```
+
+Now we should have 2 tables: "movies" and "ratings".  Let's check:
+
+```{r}
+
+dbListTables(con)
+```
+
+Looks good!  Now we'll pull some data and take a peek just to make sure that everything is as we expect:
+
+```{r}
+
+query = dbSendQuery(con, "SELECT * FROM movies LIMIT 5")
+movie_data = fetch(query)
+movie_data
+```
+
+```{r}
+
+query = dbSendQuery(con, "SELECT * FROM ratings LIMIT 5")
+rating_data = fetch(query)
+rating_data
+```
+
+The tables look fine, so we'll try to join the data "movies" and "ratings" tables using the common "movieId" field and create a new "movie_ratings" table to house the joined data:
+
+
+
+```{r results='hide'}
+
+dbSendQuery(con, "CREATE TABLE movie_ratings AS (
+SELECT  movies.movieId,ratings.userId, ratings.rating, movies.title,movies.genres 
+FROM movies
+INNER JOIN ratings ON  movies.movieId = ratings.movieId);")
+
+```
+And finally, we'll pull a sample out of the newly created tabke into an R dataframe:
+
+```{r}
+
+query = dbSendQuery(con, "SELECT * FROM movie_ratings")
+data = fetch(query)
+
+data[1:5,]
+
+write.csv(data, file = "DATA_607_WEEK2_OUTPUT.csv")
+
+dbDisconnect(con)
+
+```
