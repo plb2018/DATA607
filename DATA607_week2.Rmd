@@ -8,14 +8,14 @@ output:
 
 ---
 
-My friends and family have probably had enough of me talking about data, so I decided to use a movie dataset that I found on the internet [here](https://grouplens.org/datasets/movielens/).  I've copied the data to my [github](https://github.com/plb2018/DATA607/tree/master/ml-latest-small) and reference that copy in my code.  
+My friends and family have probably had enough of me talking about data, so rather than interview them, I decided to use a movie dataset that I found on the internet [here](https://grouplens.org/datasets/movielens/).  I've copied the data to my [github](https://github.com/plb2018/DATA607/tree/master/ml-latest-small) and reference that copy in my code.  
 
-I've opted to do all my MySQL work directly from R, so the only file that i have to show is a .rmd which can be found in my here in my github.  I've also included my output [here] (i.e. the joined table) in as a .csv in case anybody is interested.
+I've opted to do all my MySQL work directly from R, so the only file that i have to show is a .rmd which can be found in my [here](https://github.com/plb2018/DATA607/blob/master/DATA607_week2.Rmd) in my github and [here on rpubs](http://rpubs.com/plb_lttfer/359133)
 
 
 ### Load Required Packages
 
-```{r results='hide'}
+```{r results='hide', message=FALSE, warning=FALSE}
 library(RMySQL)
 library(data.table)
 
@@ -42,7 +42,7 @@ con = dbConnect(MySQL(), user=user, password=pw, dbname='DATA_607', host='localh
 ```
 
 
-Next we'll read the movie data into dataframes.  The data are contained in 3 separate files (links, ratings, movies) which we'll end up combining into a single db table later.  
+Next we'll read the movie data into dataframes.  The data we care about are contained in 2 separate files (ratings, movies) which we'll end up combining into a single db table later.  
 
 ```{r}
 
@@ -71,7 +71,7 @@ head(movies,5)
 The data look good, so now we'll load the data into individual tables in MySQL:
 
 
-```{r}
+```{r results='hide'}
 dbWriteTable(con, name='ratings', value=ratings)
 dbWriteTable(con, name='movies', value=movies)
 
@@ -112,17 +112,20 @@ FROM movies
 INNER JOIN ratings ON  movies.movieId = ratings.movieId);")
 
 ```
-And finally, we'll pull a sample out of the newly created tabke into an R dataframe:
+And finally, we'll pull a sample out of the newly created table into an R dataframe:
 
 ```{r}
 
-query = dbSendQuery(con, "SELECT * FROM movie_ratings")
+query = dbSendQuery(con, "SELECT * FROM movie_ratings LIMIT 5")
 data = fetch(query)
 
-data[1:5,]
+data
+```
 
-write.csv(data, file = "DATA_607_WEEK2_OUTPUT.csv")
+And finally, we'll close out db conneciton.
 
+
+```{r results='hide', message=FALSE, warning=FALSE}
 dbDisconnect(con)
 
 ```
