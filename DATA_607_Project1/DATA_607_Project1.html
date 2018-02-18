@@ -130,10 +130,11 @@ $(document).ready(function () {
 <li><a href="#parse-the-data">Parse the Data</a></li>
 <li><a href="#compute-the-pre-chess-rating">Compute the Pre-Chess Rating</a></li>
 <li><a href="#write-the-file">Write the File</a></li>
-<li><a href="#bonus-plots">Bonus Plots</a></li>
+<li><a href="#bonus-plot">Bonus Plot</a></li>
 </ul>
 </div>
 
+<p>All related data and files for this project can be found in my <a href="https://github.com/plb2018/DATA607/tree/master/DATA_607_Project1">github</a>. Additionally, i’ve published it to <a href="http://rpubs.com/plb_lttfer/361563">rpubs.com</a>. For this week’s assignment, all the data used is contained within this document.</p>
 <div id="load-libraries" class="section level3">
 <h3>Load Libraries</h3>
 <p>Load a few libraries that we will use along the way</p>
@@ -296,8 +297,8 @@ head(df)</code></pre>
 ## 6                1518</code></pre>
 <pre class="r"><code>write.csv(df, file = &quot;data_607_project1.csv&quot;)</code></pre>
 </div>
-<div id="bonus-plots" class="section level3">
-<h3>Bonus Plots</h3>
+<div id="bonus-plot" class="section level3">
+<h3>Bonus Plot</h3>
 <p>I just wanted to take a look and see whether there were any obvious relatioships in the data. We see below that there appears to be a positive relatioship between total points and player_pre_rating. I also wanted to see if i could extract any info by adding an additional dimension to the plot (avg_opponent_rating) via dot-color.</p>
 <pre class="r"><code>ggplot(df, aes(Player_Pre_Rating,TotalPts)) + geom_point(aes(color=Avg_Opponent_Rating)) +
 ggtitle(&quot;&quot;)</code></pre>

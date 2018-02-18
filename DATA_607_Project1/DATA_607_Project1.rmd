@@ -8,6 +8,10 @@ output:
 ---
 
 
+All related data and files for this project can be found in my  [github](https://github.com/plb2018/DATA607/tree/master/DATA_607_Project1).  Additionally, i've published it to [rpubs.com](http://rpubs.com/plb_lttfer/361563).  For this week's assignment, all the data used is contained within this document.
+
+
+
 ### Load Libraries
 
 Load a few libraries that we will use along the way
@@ -145,7 +149,7 @@ write.csv(df, file = "data_607_project1.csv")
 ``` 
 
 
-### Bonus Plots
+### Bonus Plot
 
 I just wanted to take a look and see whether there were any obvious relatioships in the data.  We see below that there appears to be a positive relatioship between total points and player_pre_rating.  I also wanted to  see if i could extract any info by adding an additional dimension to the plot (avg_opponent_rating) via dot-color.    
 
