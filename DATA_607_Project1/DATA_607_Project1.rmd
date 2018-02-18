@@ -1,0 +1,158 @@
+---
+title: "DATA 607 - Project 1"
+author: "Paul Britton"
+output: 
+  html_document:
+    toc: TRUE
+
+---
+
+
+### Load Libraries
+
+Load a few libraries that we will use along the way
+
+```{r} 
+library(stringr) 
+library(tidyr)
+library(ggplot2)
+``` 
+
+
+### Load the Data
+
+First we load the data ant take a look
+
+```{r} 
+
+source_data<- "https://raw.githubusercontent.com/plb2018/DATA607/master/DATA_607_Project1/tournamentinfo.txt" 
+rankings <- unlist(read.table(source_data,header=FALSE,sep="\n")) 
+head(rankings,10)
+```
+
+We can see immediately that the data needs a bit of processing before we can do anything with it.  We'll try to parse it with some regular expressions
+
+### Parse the Data
+
+It looks like we can extract what we need using regular expressions.  The data that we need to grab is spread across 2 rows for each player.  In both cases, the fields are consistently separated by pipes, making things a bit easier.  The first row (r1) that we want to grab begins with the player number followed by a space and a "|" delimiter.  The second row (r2) that we want begins with the the state-code (2 uppercase letters), followed by a space and a "|" delimiter.  This information should  be sufficent for us to grab and recombine the rows in a more usable format.   I sometimes find regular expressions hard to decipher, particularly if i haven't worked with them in a while, so i tend to explicitly explain them in my comments.
+
+
+```{r} 
+
+
+#if we see a 1-4 digit # followed by a space and a pipe, grab the it + the rest of the row
+r1 <- unlist(str_extract_all(rankings[5:length(rankings)],"\\d{1,4}\\s\\|.+")) 
+
+#if we see 2 uppercase letters followed by a space and a pipe, grab it + the rest of the row
+r2 <- unlist(str_extract_all(rankings[5:length(rankings)],"[[:upper:]]{2}\\s\\|.+")) 
+
+#while we're at it, we'll replace the "W's" "L's" "D's" and "B's" in r1... we just want thte #s
+r1 <- unlist(str_replace_all(r1,"\\|(W|L|B|D|H|U)\\s","|"))
+
+
+head(r1,5)
+head(r2,5)
+
+
+```
+
+The regex appears to have works as intended, so now we'll split the rows on the "|"'s while loading the data to a dataframe.  We'll then  down-select to just the cols that we need.
+
+```{r} 
+
+#create the df
+df <- data.frame(str_split_fixed(r1,"\\|",n=11),str_split_fixed(r2,"\\|",n=10))
+
+
+#grab the data we need
+cols <- c(1:10,12:13)
+df <- df[,cols]
+
+#re-order the cols 
+cols <- c(1,2,11,12,3:10)
+df <- df[,cols]
+
+
+
+#we'll also rename all the cols that we're going to keep while we're at it
+names(df) <- c("PlayerNum","PlayerName","PlayerState",
+               "USCF_Pre_Post","TotalPts","r1","r2",
+               "r3","r4","r5","r6","r7")
+
+#trim the whitespace
+df <- as.data.frame(apply(df,2,function(x)gsub("^\\s+|\\s+$", "", x)))
+
+head(df,5)
+``` 
+
+
+Now the data looks reasonably close to where we want it to be, however, we still need to deal with that last column (ID_Pre_Post).  Because the columns appear to be well formated, We're going to split the column into 3 using separate() from tidyr.  We're really only after the pre_rating column here.  Another thing of note is that the pre-rating column sometimes contains a "p" with the ranking that we want consistently on the lefthand side of the "p".
+
+```{r warning=FALSE} 
+
+#split the columns 
+df <- separate(data=df,col=USCF_Pre_Post,sep=" / R: ",into = c("USCF ID","Pre_Post"))
+df <- separate(data=df,col=Pre_Post,sep="   ->",into = c("Pre_Rating","Post_Rating"))
+
+#pre_rating sometimes contains a "p".  the resultant "etc" column is a throw-away
+df <- separate(data=df,col=Pre_Rating,sep="P",into = c("Player_Pre_Rating","etc"))
+
+head(df,5)
+
+``` 
+
+### Compute the Pre-Chess Rating
+
+
+The table looks good - all i have to do now is compute the average pre-chess score and drop all the unwanted columns.  To compute the average score, i'm going to loop over each player, figure out who they played against (cols 9:15) and use that data to look-up the pre-game ratings.  Using that data, i can compute the averages.
+
+
+```{r warning=FALSE} 
+
+pre_chess_rating = c()
+
+for (i in 1:nrow(df)){
+
+  #get all players who played against this player
+  opponent_nums <- df[i,9:15]
+  opponent_nums <-  as.numeric(levels(unlist(opponent_nums)))[unlist(opponent_nums)]
+  opponent_nums <- opponent_nums[!is.na(opponent_nums)]
+  
+  #pull scores of the opponents and compute the avg
+  pre_chess_rating[i] <- trunc(mean(as.numeric(df[opponent_nums,5])))  
+ 
+}
+
+df$Player_Pre_Rating <- as.numeric(df$Player_Pre_Rating )
+
+df$Avg_Opponent_Rating = pre_chess_rating
+
+
+```
+
+### Write the File
+
+Now we drop all the unwanted cols and write the data to file:
+
+```{r warning=FALSE} 
+
+df <- df[c(2:3,8,5,16)]
+
+head(df)
+
+write.csv(df, file = "data_607_project1.csv")
+
+``` 
+
+
+### Bonus Plots
+
+I just wanted to take a look and see whether there were any obvious relatioships in the data.  We see below that there appears to be a positive relatioship between total points and player_pre_rating.  I also wanted to  see if i could extract any info by adding an additional dimension to the plot (avg_opponent_rating) via dot-color.    
+
+```{r warning=FALSE} 
+
+ggplot(df, aes(Player_Pre_Rating,TotalPts)) + geom_point(aes(color=Avg_Opponent_Rating)) +
+ggtitle("")
+
+
+``` 
