@@ -1,0 +1,193 @@
+---
+title: "DATA 607 - WEEK 3 - Assignment"
+author: "Paul Britton"
+output:  
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    toc: True
+---
+
+### Load Packages
+
+```{r}
+library(stringr)
+library(tidyr)
+
+```
+
+
+
+# Chapter 8 - Problem 3
+
+First we'll format the original data as in the example:
+
+```{r}
+raw.data <-"555-1239Moe Szyslak(636) 555-0113Burns, C. Montgomery555-6542Rev. Timothy Lovejoy555 8904Ned Flanders636-555-3226Simpson, Homer5553642Dr. Julius Hibbert"
+
+name <- unlist(str_extract_all(raw.data, "[[:alpha:]., ]{2,}" ))
+
+phone <- unlist(str_extract_all(raw.data, "\\(?(\\d{3})?\\)?(-| )?\\d{3}(-| )?\\d{4}"))
+
+phonebook <- data.frame(name = name, phone = phone)
+
+name
+
+```
+
+## 3.1) 
+Examining the data, we can see that most of the names already adhere to the first_name last_name format.  Those that don't have a comma separator (Last, First).  So we'll loop over the names, and when we find one with a comma, we'll split it on the comma, and re-order the names:
+
+```{r}
+for (i in 1:length(name)){
+  if (grepl(",",name[i]) == TRUE){
+   name_split = unlist(str_split(name[i],","))
+   first = name_split[2]
+   last = name_split[1]
+   name[i] = paste(name_split[2], name_split[1])
+  }
+}
+
+name
+
+```
+
+First and last names are now ordered correctly.  Next we'll update our phonebook with the first and last names separated.  We'll also remove titles, but we don't want to upset Mr. Burns by removing the "C." from in front of his name!
+
+And while we're at it, we'll clean up the phone numbers a bit too...  
+
+```{r}
+
+#separate first and last names
+phonebook$name <- name
+phonebook <- separate(phonebook,name, sep = " (?=[^ ]+$)",
+         into=c("first_name","last_name"))
+
+#remove the titles
+phonebook$first_name <- gsub("[[:alpha:]]{2,}\\.\\s*", "\\1", phonebook$first_name)
+
+
+#clean up the phone numbers 
+#drop brackets
+phonebook$phone <- gsub("[()]", "", phonebook$phone)
+
+#replace spaces with dashes
+phonebook$phone <- gsub("\\s", "-", phonebook$phone)
+
+#add dashes where missing
+phonebook$phone <- gsub("(\\d{3})(\\d{4})$","\\1-\\2",phonebook$phone)
+
+#create a little function to add an area code where it's missing
+add_area_code <- function(num,chars){
+  result <- num
+  if(grepl(chars,num) == FALSE){
+    result <- paste(chars,num)
+  }
+
+  return(result)
+}
+
+#i assume that springfield is all area code 636
+phonebook$phone <- sapply(phonebook$phone, function(x) add_area_code(x,"636-") )
+
+#remove any extra spaces
+phonebook$phone <- gsub("\\s", "", phonebook$phone)
+
+phonebook
+
+```
+
+
+## 3.2)
+
+Here we're looking to see if the individual has a title.  We'll use a regular expression to look for pre-fixes that have >=2 characters, and that end in a ".".  If true, then the individual has a title.
+
+```{r}
+
+has_title <- str_detect(name,"[[:alpha:]]{2,}\\.\\s*")
+
+title <- data.frame(name,has_title)
+
+title
+
+  
+```
+
+
+## 3.3)
+
+Now we're looking to see if a character has a second name.  We'll use almost the same regular expression as for the last question.  Here, we're looking for a single occurence of an initial, followed by a ".", as in the case of Mr. Burns.
+
+```{r}
+
+has_second_name <- str_detect(phonebook$first_name,"[[:alpha:]]?\\.\\s*")
+
+second_name <- data.frame(name,has_second_name)
+
+second_name
+```
+
+  
+
+
+# Chapter 8 - Problem 4
+
+See below for code examples for all of these
+
+## 4.1) 
+match a string that contains any number of digits and ends in a "$"
+
+## 4.2)
+match words containing 1-4 lowercase letters in the range a-z
+
+## 4.3) 
+match any string (or lack thereof) preceeding ".txt" where the string ends with ".txt"
+
+## 4.4) 
+matches strings in the following common date formats "dd/mm/yyyy" and/or "mm/dd/yyyy"
+
+## 4.5)
+matches strings in the format <tag>some text</tag>
+
+Examples below:
+
+```{r}
+
+#the regex
+one <- "[0-9]+\\$"
+two <- "\\b[a-z]{1,4}\\b"
+three <- ".*?\\.txt$"
+four <- "\\d{2}/\\d{2}/\\d{4}"
+five <- "<(.+?)>.+?</\\1>"
+
+#an example match, and no-match case.
+t1 <- c("123456789$","money$")
+t2 <- "Match this But Not THIS"
+t3 <- c("match_me.txt","dont_match_me.txt ")
+t4 <- c("valentines day is 14/02/2018", "not 2018-02-15")
+t5 <- c("example html tag = <h>words</h>", "example garbage <h>garbage</q>")
+
+unlist(str_extract_all(t1,one))
+unlist(str_extract_all(t2,two))
+unlist(str_extract_all(t3,three))
+unlist(str_extract_all(t4,four))
+unlist(str_extract_all(t5,five))
+
+
+```
+
+# Chapter 8 - Problem 9
+
+```{r}
+
+secret_code <- "clcopCow1zmstc0d87wnkig7OvdicpNuggvhryn92Gjuwczi8hqrfpRxs5Aj5dwpn0TanwoUwisdij7Lj8kpf03AT5Idr3coc0bt7yczjatOaootj55t3Nj3ne6c4Sfek.r1w1YwwojigO
+d6vrfUrbz2.2bkAnbhzgv4R9i05zEcrop.wAgnb.SqoU65fPa1otfb7wEm24k6t3sR9zqe5
+fy89n6Nd5t9kc4fE905gmc4Rgxo5nhDk!gr" 
+
+answer <- unlist(str_extract_all(secret_code,"[[:upper:]]"))
+
+answer
+
+```
+
+"Congratulations you are a super nerd"... yeah... that sounds about right.  :)
