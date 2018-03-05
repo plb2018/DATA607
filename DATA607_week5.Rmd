@@ -1,0 +1,292 @@
+---
+title: "DATA 607 - WEEK 5 - Assignment"
+author: "Paul Britton"
+output:  
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    toc: True
+---
+
+#Housekeeping
+
+This doc can be found at [rpubs](http://rpubs.com/plb_lttfer/366514) and the input data files and .rmd file can be found on my github here: [Flights](https://raw.githubusercontent.com/plb2018/DATA607/master/flight_info.csv), [Weather](https://raw.githubusercontent.com/plb2018/DATA607/master/NOAA_Rainfall.csv).
+[.rmd]()
+
+
+First I'll clean up my work space:
+
+```{r}
+rm(list = ls())
+```
+
+Then we'll load all the packages that we're going to need for this exercise:
+
+```{r warning=FALSE, message=FALSE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+```
+
+#Load and Clean the Data
+
+Next we'll load the data from a CSV file.  On an initial attempt I had manually cleaned up the data directly in the CSV file by filling in column headers and adding the airline value in the "delayed" rows, however, based on some of the comments in the meetup this past week, I've decided to try to keep scalabilty in mind for this entire exercise.  As such, I decided to keep the data messy and try to come up with a scalable programatic solution to these issues.  I also tried to create code that will work "as is" if the number of cities or airlines contained in the  data is increased.  Let's load the data, clean up the colNames and take a look:
+
+
+
+```{r}
+flight.info <- read.csv("https://raw.githubusercontent.com/plb2018/DATA607/master/flight_info.csv",
+                        header=TRUE,
+                        stringsAsFactors = FALSE)
+
+
+colnames(flight.info)[1:2] = c("Airline","Status")
+
+flight.info
+
+```
+
+
+
+The data looks good, but we need to come up with a way to forward-fill the airline names into the "delayed" column - preferrable a way that would work as well on 40K rows as it does on these 4 rows.  It looks like the tidyr library provides an simple way to do this.  First, I'm going to convert the blanks to NAs, then I'll use the fill() function to forward fill the "Airline" column:
+
+
+```{r}
+
+is.na(flight.info) <- flight.info==''
+
+flight.info <- flight.info %>% fill(Airline)
+
+
+```
+
+
+Now we'll tidy the data using the gather() function from tidyr.  Rather than specify a specific column range, when calling gather(), I've decided to exclude "Airlines" and "Status".  This way, the code should scale as-is if more cities are added to the CSV file (i.e. if the data gets "wider").
+
+```{r}
+
+flight.tidy <- gather(flight.info,"City","FlightCount",-Airline,-Status)
+
+head(flight.tidy,5)
+```
+
+Our data is now tidy - time for some analysis!
+
+# Analyze the Data
+
+First we'll take a 30K ft. view (lame pun intended) of the data.  What do the raw numbers look like? What's the breakdown in terms of number of flights per airline? Who's delayed more frequently?
+
+
+
+```{r}
+
+flights.total <- flight.tidy %>% 
+  group_by(Airline) %>% 
+  summarise(flights = sum(FlightCount))
+
+flights.total$proportion <- flights.total$flights / sum(flights.total$flights)
+
+flights.total
+
+ggplot(flights.total,aes(x=Airline,y=flights)) + 
+  geom_bar(stat="identity",color = "Red", fill = "White") +
+  ggtitle("Raw Flight Count by Airline") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+ggplot(flights.total,aes(x=Airline,y=proportion)) + 
+  geom_bar(stat="identity",color = "Red", fill = "White") +
+  ggtitle("Proportion of Total Flights by Airline") +
+  ylab("Proportion") +
+  theme(plot.title = element_text(hjust = 0.5))  
+
+
+```
+
+We can see that there are about 11K flights in total, with about 65% being AM WEST and the remaining 35% being ALASKA.
+
+
+Now that we have the total flights for each airline, we'll use it to compute the proportion of delayed flights per airline.
+
+
+```{r}
+
+flights.delayed <- flight.tidy %>% 
+  group_by(Airline,Status) %>% 
+  summarise(flights = sum(FlightCount)) %>% 
+  filter(Status == "delayed") 
+
+flights.total$delayed <- flights.delayed$flights
+```
+
+A quick numerical look at the proportion of delayed flights for ALASKA and AM West, respectively:
+
+```{r}
+
+flights.total$delayed / flights.total$flights
+```
+
+And a visual Look 
+
+```{r}
+ggplot(flights.total,aes(x=Airline,y=delayed/flights)) + 
+  geom_bar(stat="identity",fill="Blue") +
+  ggtitle("Proportion of Delayed Flights by Airline ") +
+  ylab("proportion") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+We see here that ALASKA has a higher proportion of delayed flights than AM WEST.  We probably need data for several more airlines before we can make a determination as to whether this difference is significant.  
+
+Next let's look at the market-share for each airline in each market.  Here we consider the proportion of flights for each airline relative to the total number of flights in that market.
+
+
+
+```{r}
+
+flights.city <- flight.tidy %>% 
+  group_by(City) %>% 
+  summarise(flights = sum(FlightCount)) 
+```
+
+First a quick look at the total number of flights by city:
+
+```{r}
+
+flights.city
+
+ggplot(flights.city, aes(x = City, y=flights / sum(flights))) +
+  geom_bar(stat="identity",position="dodge",fill="Red") + 
+  ylab("proportion") +
+  ggtitle("Proportion of Flights by City") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+Then we look at the proportional market share of each airline by City.
+
+```{r}
+
+flights.market <- flight.tidy %>% 
+  group_by(City,Airline) %>% 
+  summarise(flights = sum(FlightCount))  %>%  
+  ungroup() %>% 
+  spread(Airline, flights, fill=0)
+
+
+flights.marketProp <- flights.market
+
+flights.marketProp[2:ncol(flights.market)] <- flights.market[2:ncol(flights.market)] / rowSums(flights.market[2:ncol(flights.market)])
+flights.marketProp <- gather(flights.marketProp,"Airline","Proportion",-City)
+
+head(flights.marketProp,5)
+
+ggplot(flights.marketProp, aes(x = Airline, y=Proportion, fill = City)) +
+  geom_bar(stat="identity",position="dodge") + 
+  xlab("Airlines") + 
+  ylab("proportion") +
+  ggtitle("Proportional Market Share by Airline and City") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+Here we see that ALASKA is dominant in the more northerly cities, particularly Seattle, whereas AM WEST is dominant in the more southerly cities, particularly Phoenix.
+
+Next we'll look at the proportion of delayed flights by airline and city.
+
+
+```{r}
+
+flights.marketDelay <- flight.tidy %>% 
+  group_by(City,Airline) %>% 
+  filter(Status == "delayed") %>% 
+  summarise(flights = sum(FlightCount))  %>%  
+  ungroup() %>% 
+  spread(Airline, flights, fill=0)
+
+
+flights.marketDelayProp <- flights.marketDelay  
+  
+flights.marketDelayProp[2:ncol(flights.market)] <- flights.marketDelay[2:ncol(flights.market)] / flights.market[2:ncol(flights.market)]
+
+flights.marketDelayProp <- gather(flights.marketDelayProp,"Airline","Proportion",-City)
+
+head(flights.marketDelayProp,5)
+
+flights.marketDelayProp %>%
+  group_by(Airline) %>% 
+  summarise(proportion = mean(Proportion))  
+
+ggplot(flights.marketDelayProp, aes(x = Airline, y=Proportion, fill = City)) +
+  geom_bar(stat="identity",position="dodge") + 
+  xlab("Airlines") + 
+  ylab("proportion") +
+  ggtitle("Proportional of Delayed Flights by Airline and Market") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(flights.marketDelayProp, aes(x = Airline, y=1-Proportion, fill = City)) +
+  geom_bar(stat="identity",position="dodge") + 
+  xlab("Airlines") + 
+  ylab("proportion") +
+  ggtitle("Proportional of On-Time Flights by Airline and Market") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+```
+
+If we look at the breakdown by City we see that San Francisco and Seattle represent the highest proportion of delays and my suspicion is that this is probably weather-related.  I found some NOAA Rainfall stats [here](https://www.currentresults.com/Weather/US/average-annual-precipitation-by-city.php) which I copied an pasted into a CSV file to explore this idea a little bit.
+
+# Weather Data - Something Extra
+
+```{r}
+
+rain.info <- read.csv("https://raw.githubusercontent.com/plb2018/DATA607/master/NOAA_Rainfall.csv",
+                        header=TRUE,
+                        stringsAsFactors = FALSE)
+
+
+#replace spaces in city names w/ dots to match our pre-existing data.
+rain.info$City <- chartr(" ", ".",rain.info$City)
+
+head(rain.info,10)
+```
+
+The rainfall data looks good, so now we'll merge it with our flight-delay data:
+
+
+```{r}
+
+rain.info <- left_join(flights.marketDelayProp,rain.info) 
+
+head(rain.info,5)
+
+```
+
+The data is merged so now we can take a quick look and see if there is any relationship between weather and flight delays.  First we'll check and see if the number of rain-days shows any relationship to delays, then we'll look at whethere there is any relationship between the quantity of precipitation and flight delays.
+
+
+```{r}
+ggplot(rain.info, aes(x = Proportion, y=Days, color = City)) +
+  geom_point( size = 5) +
+  xlab("Proportion of Flight Delays") + 
+  ylab("# Of Annual Precipitation Days") +
+  ggtitle("Flight Delays vs. Precipitation Days by City") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(rain.info, aes(x = Proportion, y=Inches, color = City)) +
+  geom_point( size = 5) +
+  xlab("Proportion of Flight Delays") + 
+  ylab("Inches Of Annual Precipitation Days") +
+  ggtitle("Flight Delays vs. Inches of Precipitation by City") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+In both cases above, we see evidence of a relationship between precipitation and and flight delays, which makes intuitive sense.  Phoenix has the fewest delays and the least bad weather whereas Seattle has the most delays and the most bad weather.  Looking at the flight delay data alone may have lead one to conclude that ALASKA was less efficient and more delay prone (percentage-wise) than AM WEST.  The addition of the weather data seems to suggest that the City matters and that because ALASKA flys more flights to cities with poor weather, particularly Seattle, they experience proportionally more delays.  In fact, the frequency of delays in the poor-weather markets (Seattle & SF) is significantly lower for ALASKA than for AM WEST, however AM WEST's overall delay numbers are only better because they fly more flights to Phoenix.  Maybe ALASKA's pilots are better in the SF & seattle fog :) 
