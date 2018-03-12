@@ -36,15 +36,15 @@ Country code,Country or area,Sort order,Major area,Code,Sort order,Region,Code,S
 120,Cameroon,31,Africa,903,7,Middle Africa,911,29,No,No,Yes
 124,Canada,234,Northern America,905,232,Northern America,905,232,Yes,No,No
 132,Cabo Verde,56,Africa,903,7,Western Africa,914,53,No,No,Yes
-535,Bonaire, Sint Eustatius and Saba,187,Latin America and the Caribbean,904,180,Caribbean,915,181,No,No,No
+535,Bonaire_ Sint Eustatius and Saba,187,Latin America and the Caribbean,904,180,Caribbean,915,181,No,No,No
 136,Cayman Islands,189,Latin America and the Caribbean,904,180,Caribbean,915,181,No,No,No
 140,Central African Republic,32,Africa,903,7,Middle Africa,911,29,No,Yes,Yes
 148,Chad,33,Africa,903,7,Middle Africa,911,29,No,Yes,Yes
 830,Channel Islands,140,Europe,908,127,Northern Europe,924,139,Yes,No,No
 152,Chile,221,Latin America and the Caribbean,904,180,South America,931,217,No,No,No
 156,China,79,Asia,935,71,Eastern Asia,906,78,No,No,No
-344,China, Hong Kong Special Administrative Region,80,Asia,935,71,Eastern Asia,906,78,No,No,No
-446,China, Macao Special Administrative Region,81,Asia,935,71,Eastern Asia,906,78,No,No,No
+344,China_ Hong Kong Special Administrative Region,80,Asia,935,71,Eastern Asia,906,78,No,No,No
+446,China_ Macao Special Administrative Region,81,Asia,935,71,Eastern Asia,906,78,No,No,No
 170,Colombia,222,Latin America and the Caribbean,904,180,South America,931,217,No,No,No
 174,Comoros,10,Africa,903,7,Eastern Africa,910,8,No,Yes,Yes
 178,Congo,34,Africa,903,7,Middle Africa,911,29,No,No,Yes
