@@ -1,0 +1,482 @@
+---
+title: "DATA 607 - Project 2"
+author: "Paul Britton"
+output:  
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    toc: True
+---
+
+#Introduction
+
+One of my intentions for project 2 was to try something different, and in this case, the thing that I tried was an abject failure.  The data sample that I posted to the forum was in .pdf format, and Jeremy pointed out that he's never worked with PDF data from R before (nor had I for that matter...). So I decided to try it out as a challenge.  My intention was to try to extract data from the .pdf "as is" and do some work with it, but after several hours of effort, and in the interest of getting the project finished on time, I decided to just choose another data source as I wasn't getting any traction.  It wasn't a waste of time as I familiarized myself with several packages and techniques (pdfTools, Tabulizer <- this one isn't on CRAN, so I also familiarized myself with non-CRAN package installation)... but in the end, I was not even able to parse the .pdf, let alone work with the data.  This is how we learn - and having found a few things that don't work, I'm better prepared for next time. :)
+
+You can find this doc on (rpubs here)[http://rpubs.com/plb_lttfer/368854] and as always, you can find all the relevant data on my (github here)[https://github.com/plb2018/DATA607/tree/master/DATA_607_Project2]
+
+
+
+
+Clear the workspace
+
+```{r}
+rm(list = ls())
+```
+
+Load the required libraries
+
+```{r warning=FALSE, echo=FALSE}
+library("tidyverse")
+
+```
+
+#Data Set 1 - Electricity Data
+
+For my first dataset, I chose to work with the electricity data posted by Rose.  Let's load it and take a look
+
+```{r}
+
+electricity.data <- read.csv("https://raw.githubusercontent.com/plb2018/DATA607/master/DATA_607_Project2/us_daily_electric_system_operating_data.csv",
+                      skip = 4)
+
+electricity.data <- rename(electricity.data,"region" = "megawatthours")
+
+head(electricity.data,5)
+
+```
+
+Initial inspection of the data shows that a few changes are required in preparation for moving to a "tidy" format.  I note that for each "region" (eg: California) there are 3 data-rows ("Demand","Net generation","Total net actual interchange") and that the region row itself is actually blank.  I'm going to copy the "region" column into a new column called "metric" and use this row to preserve the labels of the actual quantities being measured.  Then, in the "region" col, I'll convert the non-region labels to NAs and forward-fill to make sure that every row has an associated region.
+
+
+
+```{r}
+
+electricity.data$metric <- electricity.data$region
+
+electricity.data$region  <- str_replace(electricity.data$region,"Demand","")
+electricity.data$region  <- str_replace(electricity.data$region,"Net generation","")
+electricity.data$region  <- str_replace(electricity.data$region,"Total net actual interchange","")
+is.na(electricity.data$region ) <- electricity.data$region ==''
+
+electricity.data <- electricity.data %>% 
+  fill(region) %>% 
+  na.omit(electricity.data)
+
+
+head(electricity.data,5)
+
+```
+
+Now we'll transfor the data from a wide format to a long format, rename a few things, and format the dates.
+
+```{r warning=FALSE}
+
+electricity.tidy <- electricity.data %>%  
+  gather(electricity.data,power,-region,-metric) 
+
+electricity.tidy<- rename(electricity.tidy,"date" = "electricity.data")
+
+electricity.tidy <- transform(electricity.tidy, power = as.numeric(power))
+
+electricity.tidy$date <- as.Date(gsub("X","",electricity.tidy$date),"%m.%d.%Y")
+
+electricity.tidy$region <- gsub("\\(region\\)","",electricity.tidy$region)
+
+head(electricity.tidy,5)
+
+```
+
+The data is now in a format that we should be able to work with relatively easily.  The questions that rose wanted to look at were:
+*Daily demand per region
+*Daily net generation per region
+*Daily total net actual
+*Proportion of demand / total demand by region.
+
+
+
+
+```{r}
+
+totals.byRegion <- electricity.tidy %>% 
+  group_by(metric) %>% 
+  filter(!(region =="United States Lower 48 ")) %>%
+  summarize(power = sum(power))
+  #ungroup() 
+
+power.byRegion <- electricity.tidy %>% 
+  group_by(region,metric) %>% 
+  filter(!(region =="United States Lower 48 ")) %>%
+  summarize(power = mean(power)) %>%
+  ungroup() 
+
+power.byRegion$proportions = power.byRegion$power / totals.byRegion$power
+
+#interchange is on a totally different scale from demand and generation
+#so lets split them.
+power.supplyDemand <- power.byRegion %>%
+  filter(!(metric =="Total net actual interchange"))
+
+power.interchange <- power.byRegion %>%
+  filter((metric =="Total net actual interchange"))
+
+
+ggplot(power.supplyDemand, aes(x = region, y=power,fill=metric)) +
+  geom_bar(stat="identity",position="dodge")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  xlab("Region") + 
+  ylab("Power Supply and Demand (MWh)") +
+  ggtitle("Power Supply and Demand by Region") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(power.supplyDemand, aes(x = region, y=proportions,fill=metric)) +
+ geom_bar(stat="identity",position="dodge")+
+ theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  xlab("Region") + 
+  ylab("Proportional Supply and Demand") +
+  ggtitle("Proportional Power Supply and Demand by Region") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+ggplot(power.interchange, aes(x = region, y=power,fill=metric)) +
+ geom_bar(stat="identity",position="dodge")+
+ theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  xlab("Region") + 
+  ylab("Interchange (MWh)") +
+  ggtitle("Interchange by Region") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(power.interchange, aes(x = region, y=proportions*-1,fill=metric)) +
+ geom_bar(stat="identity",position="dodge")+
+ theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  xlab("Region") + 
+  ylab("Proportional Interchange") +
+  ggtitle("Proportional Interchange Region") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+```
+
+Whether we look at the data proportionally, or in absolute terms, we see more or less the same picture.  The Mid-Atlantic and Midwest regions demand and generate the most electricity.  New-England and the Southwest regions produce and demand the least, respectively.
+
+California has the biggest electricity deficite as measured by total net interchange, and the northwest has the highest surplus.
+
+
+```{r}
+
+demand.timeseries <- electricity.tidy %>% 
+  filter((metric =="Demand") & !(region =="United States Lower 48 "))
+
+ggplot(demand.timeseries, aes(x = date, y=power,color=region)) +
+  geom_line() +
+  scale_y_log10()+
+  xlab("Time") + 
+  ylab("Electricity Demand (MWh)") +
+  ggtitle("Demand By Region over Time") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+interchange.timeseries <- electricity.tidy %>% 
+  filter((metric =="Total net actual interchange") & !(region =="United States Lower 48 "))
+
+ggplot(interchange.timeseries, aes(x = date, y=power,color=region)) +
+  geom_line()+
+  xlab("Time") + 
+  ylab("Interchange (MWh)") +
+  ggtitle("Interchange by Region over Time") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+```
+
+If we look at demand and interchange by region as a timeseries, we can see that they vary considerably. In terms of demans, we can see that the majority of them seem to follow a similar pattern, namely, that they start high at the first of the year, then trail down until about Jan 10, where they abruptly reverse, spike, and then flatten out.
+
+The interchange curves seem to be reasonably stable with the occasional violent spike
+
+
+
+#Data Set 2 - Belize
+
+This dataset (posted by Albert) shows the prevalence of Dengue fever by various geographies in Belize.  In hindsight, this dataset proved to be much easier than expected.
+
+
+```{r}
+
+belize.data <- read.csv("https://raw.githubusercontent.com/plb2018/DATA607/master/DATA_607_Project2/Belize.csv",
+                        header=TRUE)
+
+head(belize.data)
+
+```
+
+We've got a wide dataset that we'll need to melt into a tidy format.  We'll also need to clean up column names and we'll change blank Types of regions to "unknown"
+
+```{r}
+belize.tidy <- belize.data %>% 
+  gather(year,fever,-Community,-Type)
+
+belize.tidy$year <- gsub("X","",belize.tidy$year)
+belize.tidy$Type <- gsub("^$","Unknown",belize.tidy$Type)
+
+head(belize.tidy)
+```
+
+The data is now more or less tidy.  One issue that remains is that there are NAs in the data.  It would appear that we can just ignore the NAs using "na.rm=TRUE".  It may or may not be ideal to do so in the real world - I think that would be dependent on context/domain knowledge.  I also tried interpolation here (acknowleding that it may not make sense in practice), but the data was much too sparse to allow for it.  It appears as though an NA required 2 adjscent data points in order to be interpolated (at least as I attempted it). Lets look at a few plots:
+
+
+
+```{r warning=FALSE}
+
+fever.type <- belize.tidy %>%
+  group_by(year,Type) %>%
+  summarize(avg = mean(fever,na.rm=TRUE))
+
+fever.type
+
+ggplot(fever.type, aes(x = year, y=avg,group=Type,color=Type)) +
+  geom_line()+
+  scale_y_log10()+ 
+  xlab("Time") + 
+  ylab("Fever Prevalence") +
+  ggtitle("Fever Prevalance by Location Type") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Firstly, in the charts we can see the spots where we're lacking data, which I feel is okay as no data exists. 
+
+```{r warning=FALSE}
+fever.Community <- belize.tidy %>%
+  group_by(year,Community) %>%
+  summarize(avg = mean(fever,na.rm=TRUE))
+
+
+fever.Community
+
+ggplot(fever.Community, aes(x = year, y=avg,group=Community,color=Community)) +
+  geom_line() +
+  scale_y_log10()+ 
+  xlab("Time") + 
+  ylab("Fever Prevalence") +
+  ggtitle("Fever Prevalance by Community") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+Secondly we can see that fever prevalance is much higher in an urban type of environment and particularly in Belize City.  I suspect that this is a known phenomenon that has to do with population density.
+
+Let's check and see if any years showed a particurlarly large spike in Dengue fever prevalence:
+
+
+```{r warning=FALSE}
+
+
+fever.diff <- belize.tidy %>%
+  group_by(year) %>%
+  summarize(avg = mean(fever,na.rm=TRUE)) %>%
+  mutate(diff = (avg - lag(avg))/avg)
+
+
+head(fever.diff,5)
+
+ggplot(fever.diff, aes(x = year, y=diff, group=1)) +
+  geom_line() +
+  xlab("Time") + 
+  ylab("Percentage Change") +
+  ggtitle("YoY Percentage Change in Fever Prevalence") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+We can see that the average year-over-year change in fever prevalence shows no real trend.  To the eye, it looks as if it may be mean-reverting around zero, but I don't think that we have enough data to make any strong statements.
+
+
+#Data Set 3 - UN Migration
+
+The third set that I've chosen is the UN Migration data as posted by Brian.  I've used specific data that he posted and also found an "Annex" data table which has mappings for all the country codes and Sort.order columns, in case I want to use that data as well.
+
+```{r}
+
+UN.data <- read.csv("https://raw.githubusercontent.com/plb2018/DATA607/master/DATA_607_Project2/UN_migrationStockByAg.csv",
+                        skip=14)
+
+UN.countryCodes <- read.csv("https://raw.githubusercontent.com/plb2018/DATA607/master/DATA_607_Project2/UN_Country_codes.csv")
+
+
+head(UN.data,5)
+
+```
+
+This data-set appears to need a whole bunch of work.  I'm going to focus on the region,age and migration data which I wont be needing, then renaming the colums as appropriate.
+
+```{r}
+
+colnames(UN.data)
+```
+
+so it looks like we want to get rid of columns 3, and 5
+
+```{r}
+
+dropCols <- colnames(UN.data)[c(3,5)]
+UN.data <- UN.data[ , !(names(UN.data) %in% dropCols)] 
+
+head(colnames(UN.data),5)
+
+```
+
+That appears to have worked.  Now we want to rename the columns.  As we see above, region-related data are contained in cols 1-4 and should be easy to manually rename.  For the actual migration data, both sexes are in columns 4-20, males in 21-37 and femails in 38-54.  I note also that column-header information that i'm looking for is actually contained in the first row.  I'm going to try to rename the columns by pulling out the 1st row values and appending it with a gender-prefix (eg: "b0-4" would be both sexes age 0-4).  Finally, we'll drop the 1st row as it will no longer be of any use.  
+
+```{r}
+
+names(UN.data)[2] <- "region"
+
+col.names <- as.matrix(UN.data[1, 4:20])
+
+colnames(UN.data)[4:20] <- colnames(UN.data[4:20]) <- paste("b",col.names,sep = "_")
+colnames(UN.data)[21:37] <- colnames(UN.data[21:37]) <- paste("m",col.names,sep = "_")
+colnames(UN.data)[38:54] <- colnames(UN.data[38:54]) <- paste("f",col.names,sep = "_")
+
+UN.data <- UN.data[-1, ] 
+
+head(UN.data,5)
+```
+
+Now the data can be converted from "wide" to "long" and into a tidy format.  Then we'll separate the "group" column into "sex" and "age.range".
+
+Also... it is at this point where I have realized that my variable containing the "tidy" data in this case is actually named "UNtidy"... ugh.
+
+```{r warning=FALSE}
+
+UN.tidy <- UN.data %>% 
+  gather(group,count,-Sort.order,-region,-Country.code)
+    
+UN.tidy <- separate(UN.tidy, group,c("sex","age.range"), sep="_")
+
+head(UN.tidy,5)
+
+
+```
+
+Looking better, but there are still a few things that we need to do to the data.  We can delete all the rows where sex=b because anything in those rows can be computed as the sum of sex=m + sex=f.  The same is true for age.range=Total - it's the sum of all age-ranges for that specific country code, and thus can be easily computed, so it doesn't represent individual observations, but the sum of individual observations.
+
+```{r warning=FALSE}
+
+UN.tidy <- UN.tidy %>% 
+  filter(!(sex== "b")) %>% 
+  filter(!(age.range == "Total"))
+
+    
+head(UN.tidy,5)
+```
+
+And, finally, we'll remove the whitespace from the "count" and convert it to a numeric type and also replace the blanks with NAs.
+
+```{r warning=FALSE}
+
+UN.tidy[UN.tidy == ".."] <- NA
+
+#first we have to remove the spaces... 
+UN.tidy$count <- gsub('\\s+', '', UN.tidy$count)
+
+UN.tidy$count <- as.numeric(UN.tidy$count)
+
+head(UN.tidy,5)
+
+```
+
+I notice also that our "region" column has non-country entries contained in it, such as "WORLD" and "Developed regions".  This is a problem and could screw up any summing or averaging work by introducing a double-counting issue.  We don't have enough data in the original set to rectify this however,  What we're going to do is add some data from the "ANNEX" file to associate every country with a "Major.Area" and a "Region".  Then we can drop all non-country entries in the data and perform some analysis.
+
+
+```{r}
+
+UN.countryCodes <- UN.countryCodes[,c(1,4,7)]
+head(UN.countryCodes,5)
+```
+
+The data looks good, so now we'll join and remove the non-country-specific rows:
+
+```{r}
+
+UN.tidy <- left_join(UN.tidy, UN.countryCodes, by= c('Country.code' = 'Country.code')) 
+
+
+UN.tidy <- UN.tidy %>% 
+  filter(!is.na(Major.area))
+
+head(UN.tidy,5)
+
+```
+
+Now we have what appears to be complete and proper "tidy" data, so lets look at a few things.
+
+```{r}
+
+migration.majorArea <- UN.tidy %>% 
+  group_by(Major.area) %>% 
+  summarise(migrants = sum(count,na.rm = TRUE))  %>%  
+  ungroup() 
+
+ggplot(migration.majorArea, aes(x = Major.area , y=migrants/sum(UN.tidy$count,na.rm=TRUE), fill=Major.area)) +
+  geom_bar(stat="identity",position="dodge") + 
+  xlab("Major Area") + 
+  ylab("Migrant Proportion") +
+  ggtitle("Migration by Major Areas") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+migration.majorAreaSex <- UN.tidy %>% 
+  group_by(Major.area,sex) %>% 
+  summarise(migrants = sum(count,na.rm = TRUE))  %>%  
+  ungroup() 
+
+ggplot(migration.majorAreaSex, aes(x = Major.area , y=migrants/sum(UN.tidy$count,na.rm=TRUE), fill=sex)) +
+  geom_bar(stat="identity",position="dodge") + 
+  xlab("Major Area") + 
+  ylab("Migrant Proportion") +
+  ggtitle("Migration by Major Areas & Sex") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+Migration is dominated by Asia, Europe and North America (about 80%).  This makes sense as these are the most populus places.  There does not appear to be huge disparity by sex, but only small differences in the proportions with Asia showing the largest migration.
+
+
+```{r}
+
+migration.age <- UN.tidy %>% 
+  group_by(age.range) %>% 
+  summarise(migrants = sum(count,na.rm = TRUE))  %>%  
+  ungroup() 
+
+
+ggplot(migration.age, aes(x = age.range, y=migrants/sum(UN.tidy$count,na.rm=TRUE), fill=age.range)) +
+  geom_bar(stat="identity",position="dodge") + 
+  xlab("Age") + 
+  ylab("Migrant Proportion") +
+  ggtitle("Migration by Age") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+migration.ageSex <- UN.tidy %>% 
+  group_by(age.range,sex) %>% 
+  summarise(migrants = sum(count,na.rm = TRUE))  %>%  
+  ungroup() 
+
+
+ggplot(migration.ageSex, aes(x = age.range , y=migrants/sum(UN.tidy$count,na.rm=TRUE), fill=sex)) +
+  geom_bar(stat="identity",position="dodge") + 
+  xlab("Age") + 
+  ylab("Migrant Proportion") +
+  ggtitle("Migration by Age and Sex") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+If we look at migration by age, we see a hump between ages 20 and 50.  Interestingly, when we break it down by sex, we see that in this high-density region, men are signigicantly more likley migrants, but women are vastly over-represented in the 75+ category.  It's unclear why this may be, but potentially, men move for work and maybe women move to be with family when they reach an older age.
+
+
