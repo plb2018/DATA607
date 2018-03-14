@@ -10,9 +10,13 @@ output:
 
 #Introduction
 
-One of my intentions for project 2 was to try something different, and in this case, the thing that I tried was an abject failure.  The data sample that I posted to the forum was in .pdf format, and Jeremy pointed out that he's never worked with PDF data from R before (nor had I for that matter...). So I decided to try it out as a challenge.  My intention was to try to extract data from the .pdf "as is" and do some work with it, but after several hours of effort, and in the interest of getting the project finished on time, I decided to just choose another data source as I wasn't getting any traction.  It wasn't a waste of time as I familiarized myself with several packages and techniques (pdfTools, Tabulizer <- this one isn't on CRAN, so I also familiarized myself with non-CRAN package installation)... but in the end, I was not even able to parse the .pdf, let alone work with the data.  This is how we learn - and having found a few things that don't work, I'm better prepared for next time. :)
+One of my intentions for project 2 was to try something different, and in this case, the thing that I tried was an abject failure.  The data sample that I posted to the forum was in .pdf format, and Jeremy pointed out that he's never worked with PDF data from R before (nor had I for that matter...). So I decided to try it out as a challenge.  My intention was to try to extract data from the .pdf "as is" and do some work with it, but after several hours of effort, and in the interest of getting the project finished on time, I decided to just choose another data source as I wasn't getting any traction with the pdf.  It wasn't a waste of time as I familiarized myself with several packages and techniques (pdfTools, Tabulizer <- this one isn't on CRAN, so I also familiarized myself with non-CRAN package installation)... but in the end, I was not even able to parse the .pdf, let alone work with the data.  This is how we learn - and having found a few things that don't work, I'm better prepared for next time. :)
 
-You can find this doc on (rpubs here)[http://rpubs.com/plb_lttfer/368854] and as always, you can find all the relevant data on my (github here)[https://github.com/plb2018/DATA607/tree/master/DATA_607_Project2]
+##Update to introduction 
+
+I took the extra time/extention given for this assignment and figured out how to parse the .pdf!  As such, i've included 4 data-sets rather than 3.  I didn't have sufficient time to perform any major analysis, but I managed to get it tidy, which appears to have been the point of the exercise.
+
+You can find this doc on [rpubs here](http://rpubs.com/plb_lttfer/368854) and as always, you can find all the relevant data on my [github here](https://github.com/plb2018/DATA607/tree/master/DATA_607_Project2)
 
 
 
@@ -480,3 +484,147 @@ ggplot(migration.ageSex, aes(x = age.range , y=migrants/sum(UN.tidy$count,na.rm=
 If we look at migration by age, we see a hump between ages 20 and 50.  Interestingly, when we break it down by sex, we see that in this high-density region, men are signigicantly more likley migrants, but women are vastly over-represented in the 75+ category.  It's unclear why this may be, but potentially, men move for work and maybe women move to be with family when they reach an older age.
 
 
+#Data Set 4 - Tax data (from a PDF)
+
+My original intention for this project was to parse and tidy a .pdf document, but initial attempt was unsuccesssful.  Given the extra time, however, I was able to get it to work, so here goes
+
+```{r}
+library(tabulizer)
+
+tax.data <- extract_tables("https://github.com/plb2018/DATA607/raw/master/DATA_607_Project2/canada_tax.pdf")
+
+typeof(tax.data[1])
+typeof(tax.data[[1]])
+```
+
+I used a package called Tabulizer.  The parsing seem to have worked but it appears to have been returned as nested lists - a list for each page of the pdf. Let's take a look at what we've got:
+
+```{r}
+
+tax.data[[1]][1:5,1:5]
+
+
+```
+
+This looks pretty messy in it's current state, so let's see if we can tidy it up a bit.  Firstly, i note that a few of the columns contain data for multiple salary-ranges.  We'll re-arrange the data to deal with this:
+
+
+```{r}
+
+tax.p1 <- data.frame(tax.data[[1]],stringsAsFactors = FALSE)
+tax.p2 <- data.frame(tax.data[[2]],stringsAsFactors = FALSE)
+
+#put the data into proper "wide" format
+tax.p2[14:28] <- tax.p2[19:nrow(tax.p2) , ]
+
+#we'll now remove the extra data... and the "total" column while we're at it.
+tax.p2 <- tax.p2[1:17, ]
+
+head(tax.p2)
+
+```
+
+Now we're going to rename the columns and drop everything that we don't need.  The column names are contained in the first few rows.  We'll paste them together where required.  Note that I'm only going to focus on page 2 of the document from here on for the sake of simplicity.
+
+```{r}
+
+
+colnames(tax.p2) <- paste(tax.p2[1, ],tax.p2[2, ],sep = " ")
+
+head(tax.p2)
+
+#drop all the columns that we dont need
+tax.p2 <- tax.p2[-14]
+tax.p2 <- tax.p2[seq(1,28,2)]
+tax.p2 <- tax.p2[-c(12:14)]
+
+head(tax.p2)
+```
+
+Now some of the columns are properly named.  Also, we no longer need the first few rows of the data, so we'll drop them.
+
+```{r}
+
+tax.p2 <- tax.p2[-1:-3,]
+
+head(tax.p2,5)
+
+```
+
+The data is starting to look much better.  We can see that we need to rename every second column.  We'll basically copy previous column names to the right, and append a "_dollars" suffix which will help us out in the next steps.
+
+
+```{r}
+
+
+colnames(tax.p2)[seq(3,11,2)] <- paste(colnames(tax.p2[seq(2,10,2)]),"_dollars",sep = " ")
+
+colnames(tax.p2)[1] <- "Region"
+
+head(tax.p2,5)
+
+```
+
+We're now ready to tidy the data.  We're going to use gather(), and then separate() the "range" column on the "_" we added in a previous step.  This will cause all rows with the "_dollar" appendix to have corresponding "dollar" entries in the "value" column, whereas we'll be left with NAs for all rows where "range" didn't have a suffix - we'll replace those NAs with "count".
+
+```{r warning=FALSE}
+
+tax.tidy <- gather(tax.p2,range,quantity,-Region) %>%
+  separate(range,c("range","value"), sep="_")  
+
+tax.tidy$value[is.na(tax.tidy$value)] <- "count"
+
+
+head(tax.tidy,5)
+
+```
+
+We're almost done.  One final thing that we're going to do is clean up the quantity column and make it numeric so that we can perform some analysis.
+
+
+```{r}
+
+tax.tidy$quantity <- as.numeric(gsub('\\$|,', '', tax.tidy$quantity))
+
+head(tax.tidy,5)
+```
+
+The data is now tidy and we can do a few quick plots:
+
+```{r warning=FALSE}
+
+tax.range <- tax.tidy %>% 
+  filter(value=="count") %>% 
+  group_by(Region,range) %>% 
+  summarise(quantity = mean(quantity,na.rm = TRUE))  %>%  
+  ungroup() 
+
+
+ggplot(tax.range, aes(x = range, y=quantity,group=Region,color=Region)) +
+  geom_line() +
+  scale_y_log10()+ 
+  xlab("Income Range") + 
+  ylab("Number of Recipients") +
+  ggtitle("# of Tax Credit Recipients by Income and Region") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+tax.rangeD <- tax.tidy %>% 
+  filter(value=="dollars") %>% 
+  group_by(Region,range) %>% 
+  summarise(quantity = mean(quantity,na.rm = TRUE))  %>%  
+  ungroup() 
+
+
+ggplot(tax.rangeD, aes(x = range, y=quantity,group=Region,color=Region)) +
+  geom_line() +
+  scale_y_log10()+ 
+  xlab("Income Range") + 
+  ylab("Tax Credits Collected") +
+  ggtitle("$ Amt of Tax Credit Collected by Income and Region") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+We can see that tax credits, in both number of recipients, and amount tend to decline as income range increases.  This finding appears to be true in all cases.
