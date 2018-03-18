@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Interesting Books>
+
+<book>
+    <title>Shackleton's Way: Leadership Lessons from the Great Antarctic Explorer</title>
+    <authors>Margot Morrel, Stephanie Capparell</authors>
+    <type>Paperback</type>
+    <pages>256</pages>
+    <isbn10>0142002364</isbn10>
+    <isbn13>978-0142002360</isbn13>
+    <amazonRating>3.7/5.0</amazonRating>
+    <reviewCount>27</reviewCount>
+</book>
+<book>
+    <title>The Last Gentleman Adventurer: Coming of Age in the Arctic</title>
+    <authors>Edward Beauclerk Maurice</authors>
+    <type>Hardcover</type>
+    <pages>416</pages>
+    <isbn10>0618517510</isbn10>
+    <isbn13> 978-0618517510</isbn13>
+    <amazonRating>5.0/5.0</amazonRating>
+    <reviewCount>1</reviewCount>
+</book>
+<book>
+    <title>The Great Explorers</title>
+    <authors>Robin Hanbury Tenison</authors>
+    <type>Hardcover</type>
+    <pages>304</pages>
+    <isbn10>050025169X</isbn10>
+    <isbn13>978-0500251690</isbn13>
+    <amazonRating>N/A</amazonRating>
+    <reviewCount>0</reviewCount>
+</book>
+</table>
+
+</body>
+</html>
