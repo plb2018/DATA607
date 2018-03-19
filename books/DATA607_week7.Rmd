@@ -1,0 +1,99 @@
+---
+title: "DATA 607 - WEEK 7 Assignment"
+author: "Paul Britton"
+output:
+  html_document:
+    highlight: pygments
+    theme: cerulean
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+#Intoduction
+
+For week 7, the task was to record book titles in several different formats and then read them into R.  The book-data for this work is available in my github, and this document can be found on rpubs.
+
+
+#Clear the Workspace
+
+```{r}
+rm(list = ls())
+```
+
+#Load the Required Packages
+
+```{r message=FALSE}
+library(XML)
+library(RCurl)
+library(rlist)
+library(jsonlite)
+library(compare)
+library(data.table)
+```
+
+# Load the HTML
+
+First we'll get the HTML file.  We'll read it from github using RCurl's getURL
+
+```{r}
+
+html <-getURL("https://raw.githubusercontent.com/plb2018/DATA607/master/books/data_607_books.html")
+
+
+html.table <- readHTMLTable(html)
+html.table <- html.table[[1]]
+
+html.table
+
+```
+
+The data is loaded to the dataframe!  
+
+# Load the XML
+
+Next we load the XML file.  We'll read the data from github in the same way as the HTML file.
+
+
+```{r}
+xml.file <-getURL("https://raw.githubusercontent.com/plb2018/DATA607/master/books/data_607_books.xml")
+
+
+xml <- xmlParse(xml.file)
+xml.table <- xmlToDataFrame(xml)
+xml.table
+
+```
+
+Once again, the data is loaded to the dataframe without issue!
+
+# Load the JSON
+
+We'll now load the JSON using jsonlite:
+
+
+```{r}
+json.file <-getURL("https://raw.githubusercontent.com/plb2018/DATA607/master/books/data_607_books.json")
+
+json.table <- fromJSON(json.file)
+
+json.table <- data.table::rbindlist(json.table)
+
+json.table
+                            
+```
+
+The data is loaded.
+
+# Quick comparison
+
+```{r}
+
+compare(html.table,xml.table,equal=TRUE)
+compare(html.table,json.table,equal=TRUE)
+```
+
+We can see visually that the content is the same for all, and that the html and xml are the same, however, the json appears to be ever-so-slightly different in that the columns are factors instead of chrs.  The is easy to change, as needed.  Based on this experience, I'd probably say that XML was the easiest.  It worked on my first attempt, and is easier to read than HTML.  JSON seems like the easiest for a human to work with, and seems less verbose than XML, but i had some issues getting it to work.  
+
+
+
