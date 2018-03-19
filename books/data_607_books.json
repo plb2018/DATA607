@@ -1,6 +1,8 @@
-[
-{"title":"Shackleton's Way: Leadership Lessons from the Great Antarctic Explorer","authors":"Margot Morrel, Stephanie Capparell","type":"Paperback","pages":"256","isbn10":"0142002364","isbn13":"978-0142002360","amazonRating":"3.7/5.0","reviewCount":"27"},
-{"title":"The Last Gentleman Adventurer: Coming of Age in the Arctic","authors":"Edward Beauclerk Maurice","type":"Hardcover","pages":"416","isbn10":"0618517510","isbn13":"978-0618517510","amazonRating":"5.0/5.0","reviewCount":"1"},
-{"title":"The Great Explorers","authors":"Robin Hanbury Tenison","type":"Hardcover","pages":"304","isbn10":"050025169X","isbn13":"978-0500251690","amazonRating":"N/A","reviewCount":"0"}
-]
-
+ {"books": [
+-	{"title":"Shackleton's Way: Leadership Lessons from the Great Antarctic Explorer","authors":"Margot Morrel, Stephanie Capparell","type":"Paperback","pages":"256","isbn-10":"0142002364","isbn-13":"978-0142002360","amazonRating":"3.7/5.0","reviewCount":"27"},
+-	{"title":"The Last Gentleman Adventurer: Coming of Age in the Arctic","authors":"Edward Beauclerk Maurice","type":"Hardcover","pages":"416","isbn-10":"0618517510","isbn-13":"978-0618517510","amazonRating":"5.0/5.0","reviewCount":"1"},
+-	{"title":"The Great Explorers","authors":"Robin Hanbury Tenison","type":"Hardcover","pages":"304","isbn-10":"050025169X","isbn-13":"978-0500251690","amazonRating":"N/A","reviewCount":"0"}
++	{"title":"Shackleton's Way: Leadership Lessons from the Great Antarctic Explorer","authors":"Margot Morrel, Stephanie Capparell","type":"Paperback","pages":"256","isbn10":"0142002364","isbn13":"978-0142002360","amazonRating":"3.7/5.0","reviewCount":"27"},
++	{"title":"The Last Gentleman Adventurer: Coming of Age in the Arctic","authors":"Edward Beauclerk Maurice","type":"Hardcover","pages":"416","isbn10":"0618517510","isbn13":"978-0618517510","amazonRating":"5.0/5.0","reviewCount":"1"},
++	{"title":"The Great Explorers","authors":"Robin Hanbury Tenison","type":"Hardcover","pages":"304","isbn10":"050025169X","isbn13":"978-0500251690","amazonRating":"N/A","reviewCount":"0"}
+ ]}
