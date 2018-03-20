@@ -1,0 +1,14 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+df <- read.table("https://raw.githubusercontent.com/plb2018/DATA607/master/Project%203/indeed_jobs_sample.csv",header=TRUE,sep=",")
+
+df
+
+
+```
