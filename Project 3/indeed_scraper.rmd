@@ -13,7 +13,7 @@ rm(list = ls())
 
 The following chunk of code scrapes job postings from indeed.com and collects the results into a dataframe.  It's a port from some python code originally used to scrape our data set.
 
-## To DO
+## To Do
 
 - The "city" data is not yet being captured as it was in Iden's code.
 - The salary data is not yet being captured.
@@ -64,58 +64,58 @@ for (city in city.set_small){
   print(paste("Downloading data for: ", city))
   for (start in range(0,max.results,10)){
   
-  url <- paste(base.url,"jobs?q=",target.job,"&l=",city,"&start=", start ,sep="")
-  page <- read_html(url)
-  Sys.sleep(1)
+    url <- paste(base.url,"jobs?q=",target.job,"&l=",city,"&start=", start ,sep="")
+    page <- read_html(url)
+    Sys.sleep(1)
   
-  #recored the city search term << not working yet...
-  #i<-i+1
-  #job.city[i] <- city
+    #recored the city search term << not working yet...
+    #i<-i+1
+    #job.city[i] <- city
   
-  #get the links
-  links <- page %>% 
-    html_nodes("div") %>%
-    html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
-    html_attr("href")
-
-  #get the job title
-  job.title <- page %>% 
-    html_nodes("div") %>%
-    html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
-    html_attr("title")
-
-  #get the job title
-  job.title <- page %>% 
-    html_nodes("div") %>%
-    html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
-    html_attr("title")
+    #get the links
+    links <- page %>% 
+      html_nodes("div") %>%
+      html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+      html_attr("href")
   
-  #get the company name
-  company.name <- page %>% 
-    html_nodes("span")  %>% 
-    html_nodes(xpath = '//*[@class="company"]')  %>% 
-    html_text() %>%
-    trimws -> company.name 
-
-  #get job location
-  job.location <- page %>% 
-    html_nodes("span") %>% 
-    html_nodes(xpath = '//*[@class="location"]')%>% 
-    html_text() %>%
-    trimws -> job.location
+    #get the job title
+    job.title <- page %>% 
+      html_nodes("div") %>%
+      html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+      html_attr("title")
   
-  #get the short sumary
-  summary.short <- page %>% 
-    html_nodes("span")  %>% 
-    html_nodes(xpath = '//*[@class="summary"]')  %>% 
-    html_text() %>%
-    trimws -> summary.short 
-
-  #get the salary <> not working yet << gave up on this for now!!
-  #job.salary <- page %>% 
-  #  html_nodes("span")  %>% 
-  #  html_nodes(xpath = '//*[@class="no-wrap"]')
+    #get the job title
+    job.title <- page %>% 
+      html_nodes("div") %>%
+      html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+      html_attr("title")
+    
+    #get the company name
+    company.name <- page %>% 
+      html_nodes("span")  %>% 
+      html_nodes(xpath = '//*[@class="company"]')  %>% 
+      html_text() %>%
+      trimws -> company.name 
   
+    #get job location
+    job.location <- page %>% 
+      html_nodes("span") %>% 
+      html_nodes(xpath = '//*[@class="location"]')%>% 
+      html_text() %>%
+      trimws -> job.location
+    
+    #get the short sumary
+    summary.short <- page %>% 
+      html_nodes("span")  %>% 
+      html_nodes(xpath = '//*[@class="summary"]')  %>% 
+      html_text() %>%
+      trimws -> summary.short 
+  
+    #get the salary <> not working yet << gave up on this for now!!
+    #job.salary <- page %>% 
+    #  html_nodes("span")  %>% 
+    #  html_nodes(xpath = '//*[@class="no-wrap"]')
+    
   }
 }
 ```
