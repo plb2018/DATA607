@@ -1,0 +1,169 @@
+---
+title: "Indeed Scraper"
+Author: "TeamRouge"
+output: html_notebook
+---
+
+
+```{r}
+rm(list = ls())
+```
+
+# Overview:
+
+The following chunk of code scrapes job postings from indeed.com and collects the results into a dataframe.  It's a port from some python code originally used to scrape our data set.
+
+## To DO
+
+- The "city" data is not yet being captured as it was in Iden's code.
+- The salary data is not yet being captured.
+
+I dont think either of these is a particularly hard fix; I just don't have time tonight.
+
+
+# Load the libraries:
+
+```{r}
+library(rvest)
+library(RCurl)
+```
+
+
+# Set the variables
+
+First we'll set a few variables that we'll use in our scraping activity.  I've used a smaller set of cities as we'll probably just use this to demonstrate how it works.
+
+```{r}
+city.set_small <- c("New+York+NY", "Seattle+WA")
+
+city.set <- c("New+York+NY", "Seattle+WA", "San+Francisco+CA",
+              "Washington+DC","Atlanta+GA","Boston+MA", "Austin+TX",
+              "Cincinnati+OH", "Pittsburgh+PA")
+
+
+target.job <- "data+scientist"   
+
+base.url <- "https://www.indeed.com/"
+
+max.results <- 10
+
+```
+
+
+# Scrape the Details
+
+Indeed.com appears to use the "GET" request method, so we can directly mess around with the URL to get the data that we want.  We're going to iterate over our target cities and scrape the particulars for each job - this includes getting the links to each individual job-page so that we can also pull the full summary
+
+
+```{r}
+
+#i = 0
+#job.city <- list()
+
+for (city in city.set_small){
+  print(paste("Downloading data for: ", city))
+  for (start in range(0,max.results,10)){
+  
+  url <- paste(base.url,"jobs?q=",target.job,"&l=",city,"&start=", start ,sep="")
+  page <- read_html(url)
+  Sys.sleep(1)
+  
+  #recored the city search term << not working yet...
+  #i<-i+1
+  #job.city[i] <- city
+  
+  #get the links
+  links <- page %>% 
+    html_nodes("div") %>%
+    html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+    html_attr("href")
+
+  #get the job title
+  job.title <- page %>% 
+    html_nodes("div") %>%
+    html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+    html_attr("title")
+
+  #get the job title
+  job.title <- page %>% 
+    html_nodes("div") %>%
+    html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+    html_attr("title")
+  
+  #get the company name
+  company.name <- page %>% 
+    html_nodes("span")  %>% 
+    html_nodes(xpath = '//*[@class="company"]')  %>% 
+    html_text() %>%
+    trimws -> company.name 
+
+  #get job location
+  job.location <- page %>% 
+    html_nodes("span") %>% 
+    html_nodes(xpath = '//*[@class="location"]')%>% 
+    html_text() %>%
+    trimws -> job.location
+  
+  #get the short sumary
+  summary.short <- page %>% 
+    html_nodes("span")  %>% 
+    html_nodes(xpath = '//*[@class="summary"]')  %>% 
+    html_text() %>%
+    trimws -> summary.short 
+
+  #get the salary <> not working yet << gave up on this for now!!
+  #job.salary <- page %>% 
+  #  html_nodes("span")  %>% 
+  #  html_nodes(xpath = '//*[@class="no-wrap"]')
+  
+  }
+}
+```
+
+# Get the Full Summary
+
+Now we're going to iterate over all the links that we've collected, pull them, and grab the full job summary for each.  Note that it appears that jobs postings are sometimes removed, in which case, we pull an empty variable.  We could probably do some cleaning in this step while downloading, but we're going to handle that downstream.
+
+
+```{r}
+
+#create a structure to hold our summaries
+summary.full <- rep(NA, length(links))
+
+for ( n in 1:length(links) ){
+  
+  #build the link
+  link <- paste(base.url,links[n],sep="")
+  
+  #pull the link
+  page <- read_html(link)
+
+  #get the full summary
+  s.full <- page %>%
+   html_nodes("span")  %>% 
+   html_nodes(xpath = '//*[@class="summary"]') %>% 
+   html_text() %>%
+   trimws -> s.full
+
+  #check to make sure we got some data and if so, append it. 
+  if (length(s.full) > 0 ){
+      summary.full[n] = s.full  
+  } 
+  
+}
+
+```
+
+
+# Put the Data into a DataFrame
+
+Now that we've collected all of the data that we want (with the exception of salaries and query-city), we'll put it into a dataframe so that it can be easily tidied and analyzed etc:
+
+```{r}
+jobs.data <- data.frame(job.title,company.name,job.location,summary.short,links,summary.full)
+
+head(jobs.data,5)
+
+```
+
+
