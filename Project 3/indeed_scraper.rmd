@@ -4,23 +4,16 @@ Author: "Group Rouge"
 output: html_notebook
 ---
 
-
-```{r}
-rm(list = ls())
-```
-
 # Overview:
-
-## Important!
-
-This scraper is working code, however, we've diabled here as it can take a while to run.  It's provided here as a working demonstration of how our data was collected.  All the actual work for this project was completed on a static data set which we collected early on in our efforts.  This was done to ensure that all group members were always working with identical data and that any user could re-produce our results as desired. 
-
-
 
 The following chunk of code scrapes job postings from indeed.com and collects the results into a dataframe.  It's a port from some python code originally used to scrape our data set.
 
+#### Important!
 
-# Load the libraries:
+This scraper is working code, however, we've diabled here as it can take a while to run.  It's provided as a working demonstration of how our data was collected.  All subsequent work for this project was completed on a static data set which we collected & crystallized early on in our efforts.  This was done to ensure that all group members were always working with identical data and that any user could re-produce our results after the fact,  as desired. 
+
+
+## Load the libraries:
 
 ```{r eval=TRUE, warning=FALSE, message=FALSE}
 library(rvest)
@@ -28,7 +21,7 @@ library(RCurl)
 ```
 
 
-# Set the variables
+## Set the variables
 
 First we'll set a few variables that we'll use in our scraping activity.  I've used a smaller set of cities as we'll probably just use this to demonstrate how it works.
 
@@ -49,7 +42,7 @@ max.results <- 50
 ```
 
 
-# Scrape the Details & Get the Full Summary
+## Scrape the Details & Get the Full Summary
 
 #### Getting the Details
 
@@ -170,7 +163,7 @@ for (city in city.set_small){
                                             summary.full))
 
     
-}
+ 
 
 }
 
