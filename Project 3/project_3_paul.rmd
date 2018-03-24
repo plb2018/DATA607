@@ -1,0 +1,156 @@
+---
+title: "Group Rouge"
+output: html_notebook
+---
+
+```{r}
+library(tidytext)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(tidyr)
+```
+
+```{r}
+
+url <- "https://raw.githubusercontent.com/plb2018/DATA607/master/Project%203/df_final.csv"
+
+df <- read.csv(url, sep=",", stringsAsFactors = F)
+
+```
+
+
+# Sentiment Analysis
+
+The idea here is to take a look at the "sentiment" of the text within each job posting and use that information as a proxy for company quality.  The thinking is that higher sentiment ranking will be indicative of better company quality ( a leap, to be sure, but probably acceptable given the scope of this project).  We'll then use this data to take a look at which skills are more heavily refered to by the highest (and lowest) sentiment ranked companies.
+
+
+## Prepare the data
+
+The first thing that we that we're going to do is tokenize the "summary" column of the data which contains all the text which we are interested in.  The essentially amounts to parsing the column into individual words and reshaping the dataframe into a "tidy" format where all individual words (tokens) are found in their own column.
+
+We'll then remove all the "stop_words" from this newly created data - words like "if", "and", "the"... etc.
+ 
+```{r}
+
+
+#tokenize the summary into individual words, drop stop words
+df <- df %>%
+  unnest_tokens(token, summary) %>%
+  anti_join(stop_words, by=c("token" = "word")) 
+
+head(df,5)
+
+```
+
+
+Next we'll map a numeric sentiment score to the words in our token column.  We're going to use the [AFINN]("http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010") set for simplicity as it maps to a simple integer score between [-5, +5] with numbers below zero representing negative sentiments and numbers above zero representing positive sentiments.
+
+
+```{r}
+#map the words to a sentiment score
+df.sentiment <- df %>%
+  inner_join(get_sentiments("afinn"),by=c("token" = "word")) #%>%
+
+head(df.sentiment[c("city","job_title","company_name","token","score")],5)
+
+```
+
+
+Next we're going to compute an average sentiment score for each company by aggregating the total sentiment score per company, and dividing by the number of job postings found for that particular company.  We'll also order the data by average sentiment.
+
+```{r}
+#pare down the data
+df.sentByComp <- df.sentiment[,c("company_name","score")]
+
+#get the number of observations per co.
+df.compCount <- df.sentiment %>% 
+  group_by(company_name) %>% 
+  summarize(num_obs = length(company_name))
+
+#aggregate the sentiment score by company
+df.sentByComp <-df.sentByComp %>%
+    group_by(company_name) %>%
+    summarize(sentiment = sum(score))
+
+#get the average sentiment score per observation
+df.sentByComp$num_obs = df.compCount$num_obs
+df.sentByComp$avg.sentiment = df.sentByComp$sentiment / df.sentByComp$num_obs
+df.sentByComp <- df.sentByComp[order(-df.sentByComp$avg.sentiment),]
+
+head(df.sentByComp,5)
+
+```
+
+
+Next we downsample the data to look at the top and bottom few companies, as per the sentiment rankings
+
+
+```{r}
+n <- 5 # number of companies to get
+
+#get the top and bottom "n" ranked companies
+bestNworst <- rbind(head(df.sentByComp,n),tail(df.sentByComp,n))
+
+bestNworst
+
+
+```
+
+Next, we inner-join our bestNworst data back to the original df, preserving only entries that correspond to companies which fall in the top or bottom "n" in terms of sentiment rank.  This should dramatically reduce the row-count from about 400K to somewhere in the low 000's.
+
+```{r}
+
+df.result <- inner_join(df,bestNworst[c("company_name","avg.sentiment")])
+
+colnames(df.result)
+
+tail(df.result[c("city","company_name","token","avg.sentiment")],5)
+
+```
+
+Now we'll rank the count the terms 
+
+```{r warning=FALSE}
+
+#remove any commas from the token column... makes it easier to remove #s 
+df.result$token <- gsub(",","",df.result$token)
+
+#count the terms for the top rated companies
+top.terms <- df.result %>%
+  filter(is.na(as.numeric(as.character(token)))) %>%   # removes numbers
+  filter(avg.sentiment > 0 ) %>%
+  count(token, sort = TRUE) 
+
+head(top.terms,5)
+
+#count the terms for the bottom rated companies
+bottom.terms <- df.result %>%
+  filter(is.na(as.numeric(as.character(token)))) %>%  # removes numbers
+  filter(avg.sentiment < 0 ) %>%
+  count(token, sort = TRUE) 
+
+head(bottom.terms,5)
+
+
+```
+
+##Plot Some Findings
+
+```{r}
+
+ggplot(head(top.terms,33), aes(reorder(token, n), n)) +
+  geom_bar(stat = "identity", fill = "Blue") +
+  labs(title = "Top Terms for Companies with Highest Sentiment",
+       x = "Term", y = "Frequency") +
+  coord_flip()
+
+
+ggplot(head(bottom.terms,33), aes(reorder(token, n), n)) +
+  geom_bar(stat = "identity", fill = "Red") +
+  labs(title = "Top Terms for Companies with Lowest Sentiment",
+       x = "Term", y = "Frequency") +
+  coord_flip()
+
+``` 
+    
