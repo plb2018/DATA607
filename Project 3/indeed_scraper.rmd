@@ -4,6 +4,12 @@ Author: "Group Rouge"
 output: html_notebook
 ---
 
+
+```{r echo=FALSE}
+rm(list = ls())
+```
+
+
 # Overview:
 
 The following chunk of code scrapes job postings from indeed.com and collects the results into a dataframe.  It's a port from some python code originally used to scrape our data set.
@@ -17,7 +23,7 @@ If you would like to see it in action, set {r eval=FALSE} to TRUE.
 
 ## Load the libraries:
 
-```{r eval=FALSE, warning=FALSE, message=FALSE}
+```{r eval=TRUE, warning=FALSE, message=FALSE}
 library(rvest)
 library(RCurl)
 ```
@@ -27,7 +33,7 @@ library(RCurl)
 
 First we'll set a few variables that we'll use in our scraping activity.  I've used a smaller set of cities as we'll probably just use this to demonstrate how it works.
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 city.set_small <- c("New+York+NY", "Seattle+WA")
 
 city.set <- c("New+York+NY", "Seattle+WA", "San+Francisco+CA",
@@ -54,7 +60,7 @@ Indeed.com appears to use the "GET" request method, so we can directly mess arou
 
 After the above is complete, we're going to iterate over all the links that we've collected, pull them, and grab the full job summary for each.  Note that it appears that jobs postings are sometimes removed, in which case, we pull an empty variable.  We could probably do some cleaning in this step while downloading, but we're going to handle that downstream.
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 
 
 
