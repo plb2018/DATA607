@@ -28,7 +28,7 @@ We collaborated as a team to understand the question, get the data, clean it, an
 
 <br>
 
-#### **Team Rouge**
+#### **Team Rouge (Group 4)**
 
 * Kavya Beheraj, <a href="https://github.com/koffeeya", target="_blank">GitHub</a>
 
@@ -55,8 +55,6 @@ We collaborated as a team to understand the question, get the data, clean it, an
 * Supervised Analysis --- *Rickidon and Violeta*
 
 * Conclusions --- *Whole Team*
-
-* Next Steps --- *Whole Team*
 
 <br>
 
@@ -988,7 +986,7 @@ ggplot(hardskills2,aes(x=reorder(variable, value), y=value)) +
 
 ### **B. Word Cloud**
 
-We used the `summary` column to create a word clou of data science skills. To begin, we specified the removal of irrelevant words and stopwords that don't add context. 
+We used the `summary` column to create a word cloud of data science skills. To begin, we specified the removal of irrelevant words and stopwords that don't add context. 
 
 ```{r}
 
@@ -1075,7 +1073,7 @@ Future sentiment-related work here should include an examination of n-grams, sen
     + On the whole, we found the supervised results much more coherent than the unsupervised. For example, a layman could review the table of skills from the supervised analysis and theorize which ones matter, but the same is not true for tables resulting from the unsupervised analysis, which contain a lot of syntactical noise and don't feel terribly salient.  While we recognize this as a product of the unsupervised methodology that could be "tuned" or "pruned," for analysis of low complexity, such tuning and pruning comes to approximate a supervised approach. This seems less efficient than deliberately prescribing keywords and terms up front.
 
 
-* **Collaboration is key in a data science project.** For a group of six strangers who are (mostly) not co-located and must work virtually (across time zones), it's important to have regular check-ins to monitor progress and correct course, if necessary.  It's also key to align early on overall workflow and timeline, roles / responsibilities in the process, and how next steps evolve.  It's good to make project management and decision frameworks explicit, though not doing so did not present issues on this project (because this team is awesome).  While we stayed on track through well-attended meetings held every few days, 
+* **Collaboration is key in a data science project.** For a group of six strangers who are (mostly) not co-located and must work virtually (across time zones), it's important to have regular check-ins to monitor progress and correct course, if necessary.  It's also key to align early on overall workflow and timeline, roles / responsibilities in the process, and how next steps evolve.  It's good to make project management and decision frameworks explicit, though not doing so did not present issues on this project (because this team is awesome).  While we stayed on track through well-attended meetings held every few days, a project plan would be a good idea for our next collaboration.
 
 
 <br>
