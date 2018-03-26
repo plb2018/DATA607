@@ -1,0 +1,1144 @@
+---
+title: "DATA 607, Project 3: The Most Valued Data Science Skills"
+date: "March 25, 2018"
+output:
+  html_document:
+    theme: yeti
+    highlight: haddock
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<hr>
+
+# **1.  Background**
+
+In this project, we used supervised and unsupervised data mining techniques on a scraped dataset of 1,303 Indeed job listings to answer the following question:
+
+>**What are the most valued data science skills?**
+
+We collaborated as a team to understand the question, get the data, clean it, analyze it, and draw conclusions. We used Slack, Google Docs, Google Hangouts, GitHub, and in-person meetings to work together, and we gave pair programming -- live and virtual -- a shot, too.
+
+<br>
+
+#### **Team Rouge**
+
+* Kavya Beheraj, <a href="https://github.com/koffeeya", target="_blank">GitHub</a>
+
+* Paul Britton, <a href="https://github.com/plb2018", target="_blank">GitHub</a>
+
+* Jeremy O'Brien, <a href="https://github.com/JeremyOBrien16", target="_blank">GitHub</a>
+
+* Rickidon Singh, <a href="https://github.com/rickidonsingh", target="_blank">GitHub</a>
+
+* Violeta Stoyanova, <a href="https://github.com/VioletaStoyanova", target="_blank">GitHub</a>
+
+* Iden Watanabe, <a href="https://github.com/EyeDen", target="_blank">GitHub</a>
+
+<br>
+
+#### **Process**
+
+* Data Acquisition --- *Iden and Paul*
+
+* Data Cleaning --- *Jeremy and Kavya*
+
+* Unsupervised Analysis --- *Iden and Paul*
+
+* Supervised Analysis --- *Rickidon and Violeta*
+
+* Conclusions --- *Whole Team*
+
+* Next Steps --- *Whole Team*
+
+<br>
+
+#### **Libraries**
+
+```{r warning=FALSE, message=FALSE}
+library(rvest)
+library(RCurl)
+library(plyr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+library(tm)
+library(wordcloud)
+library(tidytext)
+library(xtable)
+library(readr)
+library(tidytext)
+library(knitr)
+library(kableExtra)
+```
+
+
+<br>
+
+<hr>
+
+# **2. Approach**
+
+To motivate our approach to data collection and analysis, we began with the concepts of "skills" and of "value." 
+
+### **A. Definitions**
+
+>**What are the most valued data science skills?**
+
+**Skills**
+
+As discussed in our class, data science requires not only multiple skills but multiple *categories* of skills.  The many fields and industries where data science is applied likely group these skills into different categories, but after some desk research and discussion we felt that in addition to toolsets (software and platforms), both "hard" (analytical and technical) and "soft" (communcative and collaborative) skills are also important.  
+
+We used the following list of categories -- found in an <a href="https://uptowork.com/blog/data-scientist-resume-example", target="_blank">article on Data Scientist Resume Skills</a> -- as a basis for our supervised analyses. 
+
+![](https://raw.githubusercontent.com/koffeeya/msds/master/DATA%20607%20Data%20Acquisition%20and%20Management/Projects/Project%2003/data_science_skills.PNG)
+
+<br>
+
+**Value**
+
+To avoid wading into philosophical abstractions, we interpreted value in its economic sense -- that is, what skills are sought after and / or rewarded in the marketplace.  
+
+<br>
+
+### **B. Data Source**
+As the economic value of data science skills is not directly measurable, we discussed three different approaches to getting a datset:  
+
+* **Mining existing custom research** on data scientists (<a href="https://www.kaggle.com/surveys/2017", target="_blank">like that found here</a>).
+
+* **Analyzing online discussion boards** focused on data science (<a href="https://www.reddit.com/r/datascience/", target="_blank">like this one on Reddit</a>). While threads can provide a historical record (i.e., the evolution of value), there are potentially compromises in data quality and bias (whether due to fanboys, trolls, or a silent majority) and informational contents does not necessarily accord with economic value.
+
+* **Scraping online job postings** for data science roles provides perspective on what skills employers emphasize and prioritize. This third approach has its limitations: there are multiple platforms (Glassdoor, Linkedin, Monster, Careerbuilder, etc.) none of which can have a complete view of the marketplace, and scraping time-delimited job postings captures a moment in time without any longitudinality.
+
+We dimissed custom research as it didn't seem to accord with the intent of the project.  We thought that exploring online discussion boards could be valuable an alternative, fallback, or follow-up analysis.  We agreed to focus on **job postings**.  
+
+Constraints of the data source notwithsanding, testing what signals of "skill value" (i.e. frequency of terms related to data science skills) could be detected in job postings would be a good approach to this project, and one that allowed us to meet technical requirements and collaborate.
+
+After some exploration, we decided to focus on <a href="https://www.indeed.com/", target="_blank"><b>Indeed.com</b></a>, which has a wealth of data science job postings that can be scraped.  We scraped them -- first a test set for evaluation and troubleshooting, then a larger, more robust set -- to be cleaned and analyzed.  We initially used Python, and later replicated the scraper in R.
+
+<br>
+
+### **C. Analysis**
+
+We felt that the project could benefit from a two-pronged approach to analysis:  
+
+1. **A more prescriptive, supervised approach** based on cross-referencing job summaries with categorized lists of terms and calculcating the frequency of recurring keywords.  To prove the concept, we used the "hard," "soft," and "tools" lists referenced above as we found them.
+
+2. **A more exploratory, unsupervised approach** based on TF-IDF (term frequency-inverse document frequency) and sentiment analysis, which don't semantically impose preconveived keywords upon job postings (short of filtering out stop-words).
+
+To streamline our process, we conducted the two analyses in parallel, cleaning and preparing the data for both. We iterated and collaborated on the scraper, cleaning, and analysis using Slack and GitHub.
+
+<br>
+
+<hr>
+
+# **3. Data Acquisition**
+
+### **A. Note**
+
+This scraper is working code, however, we've disabled here as it can take a while to run.  It's provided here as a working demonstration of how our data was collected.  All the actual work for this project was completed on a static data set which we collected early on in our efforts.  This was done to ensure that all group members were always working with identical data and that any user could re-produce our results as desired. 
+
+The following chunk of code scrapes job postings from indeed.com and collects the results into a dataframe.  It's a port from some python code originally used to scrape our data set.
+
+<br>
+
+### **B. Set the variables**
+
+First we'll set a few variables that we'll use in our scraping activity.  We've used a smaller set of cities just to demonstrate how it works.
+
+```{r eval=FALSE}
+city.set_small <- c("New+York+NY", "Seattle+WA")
+
+city.set <- c("New+York+NY", "Seattle+WA", "San+Francisco+CA",
+              "Washington+DC","Atlanta+GA","Boston+MA", "Austin+TX",
+              "Cincinnati+OH", "Pittsburgh+PA")
+
+
+target.job <- "data+scientist"   
+
+base.url <- "https://www.indeed.com/"
+
+max.results <- 50
+
+```
+
+<br>
+
+### **C. Scrape the Details**
+
+Indeed.com appears to use the "GET" request method, so we can directly mess around with the URL to get the data that we want.  We're going to iterate over our target cities and scrape the particulars for each job - this includes getting the links to each individual job-page so that we can also pull the full summary.
+
+<br>
+
+### **D. Get the full Summary**
+
+After the above is complete, we're going to iterate over all the links that we've collected, pull them, and grab the full job summary for each.  Note that it appears that jobs postings are sometimes removed, in which case, we pull an empty variable.  We could probably do some cleaning in this step while downloading, but we're going to handle that downstream.
+
+```{r warning=FALSE, message=FALSE, eval=FALSE}
+
+#create a df to hold everything that we collect
+jobs.data <- data.frame(matrix(ncol = 7, nrow = 0))
+n <- c("city","job.title","company.name","job.location","summary.short","salary","links,summary.full")
+colnames(jobs.data)
+
+
+for (city in city.set_small){
+  print(paste("Downloading data for: ", city))
+
+  
+  for (start in range(0,max.results,10)){
+
+    url <- paste(base.url,"jobs?q=",target.job,"&l=",city,"&start=", start ,sep="")
+    page <- read_html(url)
+    Sys.sleep(1)
+  
+    #recorded the city search term << not working yet...
+    #i<-i+1
+    #job.city[i] <- city
+  
+    #get the links
+    links <- page %>% 
+      html_nodes("div") %>%
+      html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+      html_attr("href")
+    
+  
+    #get the job title
+    job.title <- page %>% 
+      html_nodes("div") %>%
+      html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+      html_attr("title")
+  
+    #get the job title
+    job.title <- page %>% 
+      html_nodes("div") %>%
+      html_nodes(xpath = '//*[@data-tn-element="jobTitle"]') %>%
+      html_attr("title")
+    
+    #get the company name
+    company.name <- page %>% 
+      html_nodes("span")  %>% 
+      html_nodes(xpath = '//*[@class="company"]')  %>% 
+      html_text() %>%
+      trimws -> company.name 
+  
+    #get job location
+    job.location <- page %>% 
+      html_nodes("span") %>% 
+      html_nodes(xpath = '//*[@class="location"]')%>% 
+      html_text() %>%
+      trimws -> job.location
+    
+    #get the short sumary
+    summary.short <- page %>% 
+      html_nodes("span")  %>% 
+      html_nodes(xpath = '//*[@class="summary"]')  %>% 
+      html_text() %>%
+      trimws -> summary.short 
+    
+  }
+  
+  #create a structure to hold our full summaries
+  summary.full <- rep(NA, length(links))
+  
+  #fill in the job data
+  job.city <- rep(city,length(links))
+  
+  #add a place-holder for the salary
+  job.salary <- rep(0,length(links))
+  
+  #iterate over the links that we collected
+  for ( n in 1:length(links) ){
+    
+    #build the link
+    link <- paste(base.url,links[n],sep="")
+    
+    #pull the link
+    page <- read_html(link)
+  
+    #get the full summary
+    s.full <- page %>%
+     html_nodes("span")  %>% 
+     html_nodes(xpath = '//*[@class="summary"]') %>% 
+     html_text() %>%
+     trimws -> s.full
+  
+    #check to make sure we got some data and if so, append it.
+    #as expired postings return an empty var
+    if (length(s.full) > 0 ){
+        summary.full[n] = s.full  
+        } 
+  
+    }
+  
+    #add the newly collected data to the jobs.data
+    jobs.data <- rbind(jobs.data,data.frame(city,
+                                            job.title,
+                                            company.name,
+                                            job.location,
+                                            summary.short,
+                                            job.salary,
+                                            links,
+                                            summary.full))
+
+    
+}
+
+
+
+```
+
+<br>
+
+<hr>
+
+# **4. Data Cleaning**
+
+The previous step resulted in raw CSV file with over 1300 rows. To clean the data, we first read in the CSV file, tested a cleaning procedure on a 100-row sample, and applied the procedure to the full dataset.
+
+### **A. Read in the dataframe**
+
+Read in raw dataframe, set separator as pipe
+```{r}
+url <- "https://raw.githubusercontent.com/koffeeya/msds/master/DATA%20607%20Data%20Acquisition%20and%20Management/Projects/Project%2003/indeed_jobs_large.csv"
+
+df <- read.csv(url, sep="|", stringsAsFactors = F)
+
+```
+
+<br>
+
+Removed "location" and "salary" columns, to reduce redundancy.
+```{r}
+df <- df[, -c(5,7)]
+
+```
+
+<br>
+
+### **B. Test cleaning procedure**
+
+
+
+Took 100-row sample of full dataset.
+```{r}
+sample <- df[sample(1:nrow(df), 100, replace=F),]
+
+```
+
+<br>
+
+Removed brackets surrounding summaries.
+```{r}
+
+sample1 <- sample %>% separate(summary_full, c("bracket", "new_summary"), sep="^[\\[]", remove=T, convert=F) %>%
+                      separate(new_summary, c("summary_full", "bracket"), sep="[\\]]$", remove=T, convert=F)
+
+sample1 <- sample1[, -c(5, 8)]
+
+```
+
+<br>
+
+Renamed column headers.
+```{r}
+
+names(sample1) <- c("list_ID", "city", "job_title", "company_name", "link", "summary")
+
+
+```
+
+<br>
+
+Removed state and plus signs from `city` column.
+```{r}
+# Separate City column into City and State by pattern of two uppercase letters after a plus sign (i.e., "+NY")
+sample2 <- sample1 %>% separate(city, c("city", "state"), sep="[\\+][[:upper:]][[:upper:]]$", convert=T)
+
+# Remove empty State column
+sample2 <- sample2[, -c(3)]
+
+# Replace plus signs with spaces
+sample2$city <- str_replace_all(sample2$city, "[\\+]", " ")
+
+```
+
+<br>
+
+Removed rows where `summary` is blank.
+```{r warning=FALSE, message=FALSE}
+
+sample3 <- filter(sample2, sample2$summary!="")
+
+head(sample3, 2) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  scroll_box(width = "800px", height = "200px")
+
+```
+
+<br>
+
+### **C. Apply cleaning procedure to full dataset**
+
+Removed brackets surrounding summaries.
+```{r}
+
+df1 <- df %>% separate(summary_full, c("bracket", "new_summary"), sep="^[\\[]", remove=T, convert=F) %>%
+              separate(new_summary, c("summary_full", "bracket"), sep="[\\]]$", remove=T, convert=F)
+
+df1 <- df1[, -c(5, 8)]
+
+```
+
+<br>
+
+Renamed column headers.
+```{r}
+
+names(df1) <- c("list_ID", "city", "job_title", "company_name", "link", "summary")
+
+```
+
+<br>
+
+Removed state and plus signs from `city` column.
+```{r}
+# Separate city column into city and state by pattern of two uppercase letters after a plus sign (i.e., "+NY")
+df2 <- df1 %>% separate(city, c("city", "state"), sep="[\\+][[:upper:]][[:upper:]]$", convert=T)
+
+# Remove empty State column
+df2 <- df2[, -c(3)]
+
+# Replace plus signs with spaces
+df2$city <- str_replace_all(df2$city, "[\\+]", " ")
+
+```
+
+<br>
+
+Removed rows where `summary` is blank.
+```{r warning=FALSE, message=FALSE}
+
+df_final <- filter(df2, df2$summary!="")
+write.csv(df_final, "indeed_final.csv", row.names = FALSE)
+
+head(df_final, 2) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  scroll_box(width = "800px", height = "200px")
+
+```
+
+<br>
+
+#### We are left with a dataset called `df_final` that has **1,303 job listings**.
+
+<br>
+
+<hr>
+
+# **5. TF-IDF Analysis**
+
+### **A. About TF-IDF**
+
+TF-IDF stands for "term frequency-inverse document frequency".  It is calculated by first calculating the term frequency of a word, $tf(t,d)$, and multiplying it by its inverse document frequency $idf(t,D)$, so that how frequent a word appears in a document is offset by its frequency in the corpus.  
+
+For example, a word might appear frequently in one chapter of a book, so much so that its frequency might put it in the top 10 words, but TF-IDF weighs the value of this word by the fact that it only appears in one chapter of, say, a hundred chapter textbook.
+
+<br>
+
+### **B. Create control List**
+
+```{r tfidf-setup}
+
+tfidf <- read.csv("indeed_final.csv", stringsAsFactors = FALSE)
+
+# Make all job titles lower case for later
+tfidf$job_title <- tolower(tfidf$job_title)
+
+# Control list to be used for all corpuses
+control_list <- list(removePunctuation = TRUE, stopwords = TRUE, tolower = TRUE,
+                     weighting = weightTfIdf)
+```
+
+<br>
+
+### **C. TF-IDF on All Job Postings**
+
+```{r attempt-1, warning = FALSE}
+corpus.all <- VCorpus(VectorSource(tfidf$summary))
+
+tdm.all <- TermDocumentMatrix(corpus.all, control = control_list)
+
+# Remove outliers consisting of very rare terms
+tdm.80 <- removeSparseTerms(tdm.all, sparse = 0.80)
+
+# Sum rows for total & make dataframe
+df_all <- tidy(sort(rowSums(as.matrix(tdm.80))))
+colnames(df_all) <- c("words", "count")
+
+# Graph
+ggplot(tail(df_all, 25), aes(reorder(words, count), count)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "TF-IDF of Indeed Job Postings",
+       x = "Words", y = "Frequency") +
+  coord_flip()
+
+```
+
+<br>
+
+### **D. Sparsity**
+
+First, a note on sparsity: Sparsity roughly controls the rarity of the word frequency.  If we run `removeSparseTerms(tdm, sparse = 0.99)`, it will remove only the rarest words, that is the words that appear in only 1% of the corpus.  On the other hand, `removeSparseTerms(tdm, sparse = 0.01)` then only words that appear in nearly every document of the corpus will be kept.
+
+For most analysis, we found that a sparsity of 80% was most beneficial.  Sparsity > 80% often included words that were more important to job postings as a whole, and not to the specifics we wanted for the purpose of our question.
+
+When each job postings are treated as individual documents, skills like "machine learning", "analytics", "statistics/statistical", and "models/modeling" are very important for data scientists to have.
+
+<br>
+
+### **E. TF-IDF on Job Postings by Cities**
+```{r attempt-2, fig.width = 10, fig.height = 11, warning = FALSE}
+# Trying to divide the corpus by cities
+nyc <- paste(tfidf[tfidf$city == "New York", 6], collapse = " ")
+sea <- paste(tfidf[tfidf$city == "Seattle", 6], collapse = " ")
+sf <- paste(tfidf[tfidf$city == "San Francisco", 6], collapse = " ")
+dc <- paste(tfidf[tfidf$city == "Washington", 6], collapse = " ")
+atl <- paste(tfidf[tfidf$city == "Atlanta", 6], collapse = " ")
+bos <- paste(tfidf[tfidf$city == "Boston", 6], collapse = " ")
+aus <- paste(tfidf[df_final$city == "Austin", 6], collapse = " ")
+cin <- paste(tfidf[df_final$city == "Cincinnati", 6], collapse = " ")
+pitt <- paste(tfidf[tfidf$city == "Pittsburgh", 6], collapse = " ")
+
+cities <- c(nyc, sea, sf, dc, atl, bos, aus, cin, pitt)
+
+corpus.city <- VCorpus(VectorSource(cities))
+
+tdm.city <- TermDocumentMatrix(corpus.city, control = control_list)
+
+# Make city dataframe
+df_city <- tidy(tdm.city)
+df_city$document <- mapvalues(df_city$document,
+                              from = 1:9,
+                              to = c("NYC", "SEA", "SF",
+                                     "DC", "ATL", "BOS",
+                                     "AUS", "CIN", "PITT"))
+
+df_city %>%
+  arrange(desc(count)) %>%
+  mutate(word = factor(term, levels = rev(unique(term))),
+           city = factor(document, levels = c("NYC", "SEA", "SF",
+                                              "DC", "ATL", "BOS",
+                                              "AUS", "CIN", "PITT"))) %>%
+  group_by(document) %>%
+  top_n(6, wt = count) %>%
+  ungroup() %>%
+  ggplot(aes(word, count, fill = document)) +
+  geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+  labs(title = "Highest TF-IDF Words in Job Listings by City",
+       x = "Words", y = "TF-IDF") +
+  facet_wrap(~city, ncol = 2, scales = "free") +
+  coord_flip()
+
+# write.csv(df_city, "city_tfidf.csv", row.names = FALSE)
+```
+
+<br>
+
+In this attempt, job postings were grouped by the cities they were listed in.  When broken down this way, the companies themselves became the most important words rather than skills.
+
+<br>
+
+### **F. TF-IDF Based on Job Titles**
+```{r attempt-3, warning = FALSE}
+# Data Scientist - 739 instances
+ds <- tfidf[grep("data scientist", tolower(tfidf$job_title)), 6]
+ds.corpus <- VCorpus(VectorSource(ds))
+ds.tdm <- TermDocumentMatrix(ds.corpus, control = control_list)
+
+ds.80 <- removeSparseTerms(ds.tdm, sparse = 0.80)
+df_ds <- tidy(sort(rowSums(as.matrix(ds.80))))
+colnames(df_ds) <- c("words", "count")
+
+ggplot(tail(df_ds, 25), aes(reorder(words, count), count)) +
+  geom_bar(stat = "identity", fill = "red") +
+  labs(title = "TF-IDF of Data Scientist Job Titles",
+       x = "Words", y = "Frequency") +
+  coord_flip()
+
+
+# Senior / Sr. - 84 instances
+# Intern - 61 instance
+# Senior vs Intern
+# Not very illuminating
+senior <- paste(tfidf[grep("senior", tolower(tfidf$job_title)), 6], collapse = " ")
+intern <- paste(tfidf[grep("intern", tolower(tfidf$job_title)), 6], collapse = " ")
+jrsr.corpus <- VCorpus(VectorSource(c(senior, intern)))
+jrsr.tdm <- TermDocumentMatrix(jrsr.corpus, control = control_list)
+df_jrsr <- tidy(jrsr.tdm)
+df_jrsr$document <- mapvalues(df_jrsr$document, from = 1:2,
+                              to = c("senior", "intern"))
+
+df_jrsr %>%
+  arrange(desc(count)) %>%
+  mutate(word = factor(term, levels = rev(unique(term))),
+           type = factor(document, levels = c("senior", "intern"))) %>%
+  group_by(document) %>%
+  top_n(25, wt = count) %>%
+  ungroup() %>%
+  ggplot(aes(word, count, fill = document)) +
+  geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+  labs(title = "TF-IDF of Senior vs Junior Jobs",
+       x = "Words", y = "TF-IDF") +
+  facet_wrap(~type, ncol = 2, scales = "free") +
+  coord_flip()
+
+# Machine Learning - 124 instances
+ml <- tfidf[grep("machine learning", tolower(tfidf$job_title)), 6]
+ml.corpus <- VCorpus(VectorSource(ml))
+ml.tdm <- TermDocumentMatrix(ml.corpus, control = control_list)
+
+ml.70 <- removeSparseTerms(ml.tdm, sparse = 0.70)
+df_ml <- tidy(sort(rowSums(as.matrix(ml.70))))
+colnames(df_ml) <- c("words", "count")
+
+ggplot(tail(df_ml, 25), aes(reorder(words, count), count)) +
+  geom_bar(stat = "identity", fill = "green") +
+  labs(title = "TF-IDF for Machine Learning Jobs",
+       x = "Words", y = "Count") +
+  coord_flip()
+
+# Research - 119 instances
+research <- tfidf[grep("research", tfidf$job_title), 6]
+r.corpus <- VCorpus(VectorSource(research))
+r.tdm <- TermDocumentMatrix(r.corpus, control = control_list)
+
+r.80 <- removeSparseTerms(r.tdm, sparse = 0.80)
+df_r <- tidy(sort(rowSums(as.matrix(r.80))))
+colnames(df_r) <- c("words", "count")
+
+ggplot(tail(df_r, 25), aes(reorder(words, count), count)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  labs(title = "TF-IDF for Research Job Titles",
+       x = "Words", y = "Count") +
+  coord_flip()
+```
+
+<br>
+
+Though our primary search term was "Data Scientist", Indeed also returned other job titles.  These were some of the most common instances.  Unsurprisingly, "Data Scientist" itself matches with what we see in the analysis of all job postings.  We thought there might be an interesting shift between "senior" level jobs and internships, with perhaps a strong prevelance of "soft skills" for the higher level jobs, but did not see much evidence of that in the data.
+
+<br>
+
+<hr>
+
+# **6. Sentiment Analysis**
+
+The idea here is to take a look at the "sentiment" of the text within each job posting and use that information as a proxy for company quality.  The thinking is that higher sentiment ranking will be indicative of better company quality ( a leap, to be sure, but probably acceptable given the scope of this project).  We'll then use this data to take a look at which skills are more heavily refered to by the highest (and lowest) sentiment ranked companies.
+
+<br>
+
+### **A. Prepare the data**
+
+The first thing that we that we're going to do is tokenize the "summary" column of the data which contains all the text which we are interested in.  The essentially amounts to parsing the column into individual words and reshaping the dataframe into a "tidy" format where all individual words (tokens) are found in their own column.
+
+We'll then remove all the "stop_words" from this newly created data -- words like "if", "and", "the"... etc.
+
+<br>
+ 
+```{r}
+
+
+#tokenize the summary into individual words, drop stop words
+df.sent <- df_final %>%
+  unnest_tokens(token, summary) %>%
+  anti_join(stop_words, by=c("token" = "word")) 
+
+head(df.sent,5) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% 
+  scroll_box(width = "800px", height = "200px")
+
+
+```
+
+<br>
+
+Next we'll map a numeric sentiment score to the words in our token column.  We're going to use the [AFINN]("http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010") set for simplicity as it maps to a simple integer score between [-5, +5] with numbers below zero representing negative sentiments and numbers above zero representing positive sentiments.
+
+
+```{r}
+#map the words to a sentiment score
+df.sentiment <- df.sent %>%
+  inner_join(get_sentiments("afinn"),by=c("token" = "word")) #%>%
+
+head(df.sentiment[c("city","job_title","company_name","token","score")],5) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+```
+
+<br>
+
+Next we're going to compute an average sentiment score for each company by aggregating the total sentiment score per company, and dividing by the number of job postings found for that particular company.  We'll also order the data by average sentiment.
+
+```{r}
+#pare down the data
+df.sentByComp <- df.sentiment[,c("company_name","score")]
+
+#get the number of observations per co.
+df.compCount <- df.sentiment %>% 
+  dplyr::group_by(company_name) %>% 
+  dplyr::summarize(num_obs = length(company_name))
+
+#aggregate the sentiment score by company
+df.sentByComp <-df.sentByComp %>%
+   dplyr::group_by(company_name) %>%
+   dplyr::summarize(sentiment = sum(score))
+
+#get the average sentiment score per observation
+df.sentByComp$num_obs = df.compCount$num_obs
+df.sentByComp$avg.sentiment = df.sentByComp$sentiment / df.sentByComp$num_obs
+df.sentByComp <- df.sentByComp[order(-df.sentByComp$avg.sentiment),]
+
+head(df.sentByComp,5) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+```
+
+<br>
+
+Next we downsample the data to look at the top and bottom few companies, as per the sentiment rankings.
+
+```{r}
+n <- 5 # number of companies to get
+
+#get the top and bottom "n" ranked companies
+bestNworst <- rbind(head(df.sentByComp,n),tail(df.sentByComp,n))
+
+bestNworst %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+```
+
+<br>
+
+Next, we inner-join our bestNworst data back to the original df, preserving only entries that correspond to companies which fall in the top or bottom "n" in terms of sentiment rank.  This should dramatically reduce the row-count from about 400K to somewhere in the low 000's.
+
+```{r}
+
+df.result <- inner_join(df.sent,bestNworst[c("company_name","avg.sentiment")])
+
+colnames(df.result)
+
+tail(df.result[c("city","company_name","token","avg.sentiment")], 5) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+```
+
+<br>
+
+Now we'll rank the count the terms 
+
+```{r warning=FALSE}
+
+#remove any commas from the token column... makes it easier to remove #s 
+df.result$token <- gsub(",","",df.result$token)
+
+#count the terms for the top rated companies
+top.terms <- df.result %>%
+  dplyr::filter(is.na(as.numeric(as.character(token)))) %>%   # removes numbers
+  dplyr::filter(avg.sentiment > 0 ) %>%
+  dplyr::count(token, sort = TRUE) 
+
+head(top.terms,5)
+
+#count the terms for the bottom rated companies
+bottom.terms <- df.result %>%
+  dplyr::filter(is.na(as.numeric(as.character(token)))) %>%  # removes numbers
+  dplyr::filter(avg.sentiment < 0 ) %>%
+  dplyr::count(token, sort = TRUE) 
+
+head(bottom.terms,5) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+
+```
+
+<br>
+
+### **B. Plot Some Findings**
+
+```{r}
+
+ggplot(head(top.terms,33), aes(reorder(token, n), n)) +
+  geom_bar(stat = "identity", fill = "Blue") +
+  labs(title = "Top Terms for Companies with Highest Sentiment",
+       x = "Term", y = "Frequency") +
+  coord_flip()
+
+
+ggplot(head(bottom.terms,33), aes(reorder(token, n), n)) +
+  geom_bar(stat = "identity", fill = "Red") +
+  labs(title = "Top Terms for Companies with Lowest Sentiment",
+       x = "Term", y = "Frequency") +
+  coord_flip()
+
+``` 
+
+<br>
+
+<hr>
+
+
+# **7. Supervised Analysis**
+
+Our goal was to find the most valued data science skills using a supervised approach. We created new variables for analyzing three types of skills (hard skills, soft skills, and tool skills).
+
+Assumptions:
+
+- We assumed certain terms fell into certain categories and searched for them. 
+
+- We arrived at these categories based on outside SMEs (subject-matter experts). 
+
+- We assumed that our analysis tools would lead to conclusions without human intervention.
+
+<br>
+
+### **A. Frequency of Skills**
+
+<br>
+
+#### **Technical Skills**
+
+We used the `mutate` function to create new variables for the tool skills category and preserve existing variables from the summary column, and turned on case insensitivity.
+
+```{r}
+
+toolskills <- df_final %>%
+    mutate(R = grepl("\\bR\\b,", summary)) %>%
+    mutate(python = grepl("Python", summary, ignore.case=TRUE)) %>%
+    mutate(SQL = grepl("SQL", summary, ignore.case=TRUE)) %>%
+    mutate(hadoop = grepl("hadoop", summary, ignore.case=TRUE)) %>%
+    mutate(perl = grepl("perl", summary, ignore.case=TRUE)) %>%
+    mutate(matplotlib = grepl("matplotlib", summary, ignore.case=TRUE)) %>%
+    mutate(Cplusplus = grepl("C++", summary, fixed=TRUE)) %>%
+    mutate(VB = grepl("VB", summary, ignore.case=TRUE)) %>%
+    mutate(java = grepl("java\\b", summary, ignore.case=TRUE)) %>%
+    mutate(scala = grepl("scala", summary, ignore.case=TRUE)) %>%
+    mutate(tensorflow = grepl("tensorflow", summary, ignore.case=TRUE)) %>%
+    mutate(javascript = grepl("javascript", summary, ignore.case=TRUE)) %>%
+    mutate(spark = grepl("spark", summary, ignore.case=TRUE)) %>%
+    
+select(job_title, company_name, R, python, SQL, hadoop, perl, matplotlib, Cplusplus, VB, java, scala, tensorflow, javascript, spark)
+
+```
+
+<br>
+
+Applied the `summarise_all` function to all (non-grouping) columns.
+
+```{r}
+toolskills2 <- toolskills %>% select(-(1:2)) %>% summarise_all(sum) %>% gather(variable,value) %>% arrange(desc(value))
+```
+
+<br>
+
+Visualized the most in-demand tool sKills:
+
+```{r}
+ggplot(toolskills2,aes(x=reorder(variable, value), y=value)) + geom_bar(stat='identity',fill="green") + xlab('') + ylab('Frequency') + labs(title='Tool Skills') + coord_flip() + theme_minimal()
+```
+
+**Python, SQL, and R** are the most in-demand tool skills according to Indeeed job posts, with the least in-demand tool skill being VB.
+
+<br>
+
+#### **Soft Skills**
+
+We used the `mutate` function to create new variables for the soft skills category and preserve existing variables from the summary column, and turned on case insensitivity.
+
+```{r}
+
+softskills <- df_final %>%
+    mutate(workingremote = grepl("working remote", summary, ignore.case=TRUE)) %>%
+    mutate(communication = grepl("communicat", summary, ignore.case=TRUE)) %>%
+    mutate(collaborative = grepl("collaborat", summary, ignore.case=TRUE)) %>%
+    mutate(creative = grepl("creativ", summary, ignore.case=TRUE)) %>%
+    mutate(critical = grepl("critical", summary, ignore.case=TRUE)) %>%
+    mutate(problemsolving = grepl("problem solving", summary, ignore.case=TRUE)) %>%
+    mutate(activelearning = grepl("active learning", summary, ignore.case=TRUE)) %>%
+    mutate(hypothesis = grepl("hypothesis", summary, ignore.case=TRUE)) %>%
+    mutate(organized = grepl("organize", summary, ignore.case=TRUE)) %>%
+    mutate(judgement = grepl("judgement", summary, ignore.case=TRUE)) %>%
+    mutate(selfstarter = grepl("self Starter", summary, ignore.case=TRUE)) %>%
+    mutate(interpersonalskills = grepl("interpersonal skills", summary, ignore.case=TRUE)) %>%
+    mutate(atttodetail = grepl("attention to detail", summary, ignore.case=TRUE)) %>%
+    mutate(visualization = grepl("visualization", summary, ignore.case=TRUE)) %>%
+    mutate(leadership = grepl("leadership", summary, ignore.case=TRUE)) %>%
+
+select(
+  job_title, company_name, workingremote, communication, collaborative, creative, critical, problemsolving, 
+  activelearning, hypothesis, organized, judgement, selfstarter, interpersonalskills, atttodetail, 
+  visualization, leadership)
+    
+summary(softskills) %>% 
+  kable("html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  scroll_box(width = "800px", height = "200px")
+
+```
+
+<br>
+
+Applied the `summarise_all` function to all (non-grouping) columns.
+
+```{r}
+softskills2 <- softskills %>% 
+               select(-(1:2)) %>% 
+               summarise_all(sum) %>% 
+               gather(variable,value) %>% 
+               arrange(desc(value))
+```
+
+<br>
+
+Visualized the most in-demand soft sKills:
+
+```{r}
+ggplot(softskills2,aes(x=reorder(variable, value), y=value)) + geom_bar(stat='identity',fill="green") + xlab('') + ylab('Frequency') + labs(title='Soft Skills') + coord_flip() + theme_minimal()
+```
+
+**Communication, collaboration, and visualization** are the most in-demand soft skills according to Indeeed job posts, with the least in-demand soft skill being active learning.
+
+<br>
+
+#### **Hard Skills**
+
+We used the `mutate` function to create new variables for the hard skills category and preserve existing variables from the summary column, and turned on case insensitivity.
+
+```{r}
+
+hardskills <- df_final %>%
+    mutate(machinelearning = grepl("machine learning", summary, ignore.case=TRUE)) %>%
+    mutate(modeling = grepl("model", summary, ignore.case=TRUE)) %>%
+    mutate(statistics = grepl("statistics", summary, ignore.case=TRUE)) %>%
+    mutate(programming = grepl("programming", summary, ignore.case=TRUE)) %>%
+    mutate(quantitative = grepl("quantitative", summary, ignore.case=TRUE)) %>%
+    mutate(debugging = grepl("debugging", summary, ignore.case=TRUE)) %>%
+    mutate(statistics = grepl("statistics",  summary, ignore.case=TRUE)) %>%
+    
+
+select(job_title, company_name, machinelearning, modeling, statistics, programming, quantitative, debugging, statistics)
+
+summary(hardskills) %>% 
+               kable("html") %>% 
+               kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+```
+
+<br>
+
+Applied the `summarise_all` function to all (non-grouping) columns.
+
+```{r}
+hardskills2 <- hardskills %>% 
+               select(-(1:2)) %>% 
+               summarise_all(sum) %>% 
+               gather(variable,value) %>% 
+               arrange(desc(value))
+```
+
+<br>
+
+Visualized the most in-demand hard skills:
+
+```{r}
+ggplot(hardskills2,aes(x=reorder(variable, value), y=value)) + 
+  geom_bar(stat='identity',fill="green") + 
+  xlab('') + 
+  ylab('Frequency') + 
+  labs(title='Hard Skills') + 
+  coord_flip() + 
+  theme_minimal()
+```
+
+**Modeling and machine learning** are the most in-demand hard skills according to Indeeed job posts, with the least in-demand hard skill being debugging.
+
+<br>
+
+### **B. Word Cloud**
+
+We used the `summary` column to create a word clou of data science skills. To begin, we specified the removal of irrelevant words and stopwords that don't add context. 
+
+```{r}
+
+datacloud <- Corpus(VectorSource(df_final$summary))
+
+datacloud <- tm_map(datacloud, removePunctuation)
+
+datacloud <- tm_map(datacloud, tolower)
+
+datacloud <- tm_map(datacloud, removeWords, c("services", "data", "andor", "ability", "using", "new", "science", "scientist" , "you", "must", "will", "including", "can", stopwords('english')))
+
+```
+
+<br>
+
+Then, we visualized our data science word cloud:
+
+```{r}
+wordcloud(datacloud, 
+          max.words = 80, 
+          random.order = FALSE, 
+          scale=c(3,.3),
+          random.color = FALSE,
+          colors=palette())
+```
+
+<br>
+
+<hr>
+# **8. Conclusions**
+
+<br>
+
+### **A. What are the most valued data science skills?**
+
+#### **Supervised Approach**
+
+The supervised approach showed us which of the data science skills that we looked up were the most and least in-demand -- and therefore, we assume, the most valuable:
+
+**Most in-demand**
+
+* Hard skills: modeling and machine learning
+* Soft skills: communication, collaboration, and visualization
+* Tools skills: Python, SQL, R
+
+**Least in-demand**
+
+* Hard skills: debugging
+* Soft skills: self-starter, working remotely, and active learning
+* Tools skills: Perl and VB
+
+The list of most in-demand skills is consistent with the tenor and topics of conversation in the field.  While motivation, independence, and continuous learning do seem like important requisites to a success in data science, these are either relatively less so in our sample or potentially are conveyed in language opaque to our analysis.
+
+These findings can not only inform how job seekers position their experience and skills, but how learning programs and bootcamps structure their curricula.  Additionally, this information could help prospective employers of data scientists to understand how to communicate their own requirements, or how their requirements compare with others hiring in the marketplace, or even what their competitive set looks like.
+
+<br>
+
+#### **TF-IDF Approach**
+
+Hard skills had a higher score in most situations.  "Machine" and "learning", "statistics" and "analysis" appeared high in most of our graphs.  Soft and technical skills didn't appear at all.  However, the results should not be considered conclusive as the TF-IDF approach lacked any proper context.  When the corpus was broken down by cities, the name of companies became the highest scoring terms.  
+
+We attempted to make the results more coherent by lowering the sparsity, but this method was arbitrary in nature.  This makes sense as TF-IDF is often used in conjunction with other algorithms.  For example, we might have been able to get our much-needed context by feeding our TF-IDF matrices into a k-means algorithm. Then we could see how certain words grouped together.  In this way, we could prune our corpuses to focus solely on what words are important to data scientist jobs, as opposed to what words are important to job posts in general.
+
+<br>
+
+#### **Sentiment Approach**
+
+The sentiment analysis did not seem to be biased towards either soft or hard skills with terms such as "data", "experience" ,"technical", "modeling" , "development", "python" and "team" coming in near the top.  It did, however, seem to be confused by terms that the supervised approach would never include as "relevant".  For example, terms like "including" and "national" were found near the top of the list -- these terms are likely artifacts of the process rather than important data science terms.
+
+There did not appear to be any coherent difference between top- and bottom-rated companies, which made drawing a meaningful conclusion from any comparison between the two sets difficult.  One thing of note was that the distribution for "positive sentiment" companies had significantly more right-skew in the frequency of terms being reported as relevant. More analysis would likely be required to uncover the meaning behing this observation.
+
+At a high level, the sentiment testing was likely a bit mis-specified in the sense that a generic sentiment mapping was used and it was applied to individual words (i.e., ignoring the context of the word within the sentence) which may be less than optimal given the specific task here.
+
+Future sentiment-related work here should include an examination of n-grams, sentences, paragraphs, or even entire summaries so as to capture the entire context of what is being said.  A custom list of stop-words would also be beneficial here as there are we found many words that are not traditionally considered stop words, but which recurr in almost every job posting and thus provide little value.
+
+<br>
+
+### **B. Conclusions about the process**
+
+* **Running parallel workstreams added depth to our analysis.** It allowed us to compare and contrast the outputs of the supervised and unsupervised methods -- a neat and tangible learning opportunity for the team.  
+
+* **Context matters.** All data science methods -- supervised or unsupervised -- require that the user has background knowledge and context to determine whether the ouput is valuable. We can't assume that the results of any method will be salient on their own, especially if the method is unsupervised.
+
+    + On the whole, we found the supervised results much more coherent than the unsupervised. For example, a layman could review the table of skills from the supervised analysis and theorize which ones matter, but the same is not true for tables resulting from the unsupervised analysis, which contain a lot of syntactical noise and don't feel terribly salient.  While we recognize this as a product of the unsupervised methodology that could be "tuned" or "pruned," for analysis of low complexity, such tuning and pruning comes to approximate a supervised approach. This seems less efficient than deliberately prescribing keywords and terms up front.
+
+
+* **Collaboration is key in a data science project.** For a group of six strangers who are (mostly) not co-located and must work virtually (across time zones), it's important to have regular check-ins to monitor progress and correct course, if necessary.  It's also key to align early on overall workflow and timeline, roles / responsibilities in the process, and how next steps evolve.  It's good to make project management and decision frameworks explicit, though not doing so did not present issues on this project (because this team is awesome).  While we stayed on track through well-attended meetings held every few days, 
+
+
+<br>
+
+<hr>
+
+# **9. Assumptions**
+
+While touched on above, we want to make clear the assumptions we held at each step of the process. These assumptions ultimately informed the direction of our approach, the content of our analysis, and the conclusions we could draw.
+
+
+### **A. Overall Assumptions**
+
+* "Skills" refer to hard skills, soft skills, and technical skills of the individual data scientist.
+
+* We can determine a skill's value by looking at job postings. Specifically, job postings on Indeed for the search term "Data Scientist". Employers list skills that they need and find more valuable.
+
+* Job postings have the most up-to-date information on real employer needs, compared to other data sources such as data science course curricula, surveys of data scientists, and the Reddit page for data science.
+
+<br>
+
+### **B. Scraping Assumptions**
+
+* The data we scraped is representative of all jobs. Indeed data is comparable to other job posting websites.
+
+* The moment we scraped data can be longitudinally extrapolated -- it isn't an outlier. What we scrape is expected to be valid right now, but not necessarily into the future.
+
+<br>
+
+### **C. Cleaning Assumptions**
+
+* All of the sections listed in a job post -- and not just ones related to the potential employee -- are useful in identifying the skills that employers most value. We arrived at this conclusion after reviewing a random sample of postings and concluding that there was valuable information throughout the summary.
+
+* We kept observations discrete -- as a corpus -- rather than as a single string. We also kept special characters and stopwords. This allowed the downstream user to decide what was important.
+
+<br>
+
+### **D. Analysis Assumptions**
+
+* **Overall**
+
+    + We assumed that we would be able to compare the results of the two approaches.
+    + We assumed that if we applied the appropriate data mining methods to the raw data, the methods -- on their own -- would tell us what was important.
+
+<br>
+
+* **Supervised Approach**
+
+    + We assumed certain terms fell into certain categories and searched for them.
+    + We arrived at these categories based on online subject-matter experts.
+    + We removed some stopwords, and words like "data", that we assumed would not add context.
+
+<br>
+
+* **TF-IDF Approach**
+    + We assumed that TF-IDF would simply be a "smarter" version of calculating term-frequency. After running the algorithm on our corpus of job postings, we thought the key words would be roughly the same as the supervised, but with the added bonus of not having to find a list ahead of time.  This proved not to be the case, as the more valuable words were sometimes generic in nature.  
+    + It appeared that the analysis would prove more useful to the business side, helping HR write a better data scientist job posting, rather than the employee trying to figure out what data science skills might be in demand.
+
+<br>
+
+* **Sentiment Analysis**
+    + We assumed that higher-sentiment companies are companies more people want to work for, therefore the skills they look for are more valuable.
+
+<br>
+
+<hr>
