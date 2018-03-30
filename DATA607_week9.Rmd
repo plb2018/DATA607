@@ -1,0 +1,120 @@
+---
+title: "DATA 607 - WEEK 9 Assignment"
+author: "Paul Britton"
+output:
+  html_document:
+    highlight: pygments
+    theme: cerulean
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r, echo=FALSE}
+rm(list = ls())
+```
+
+
+The task for week 9 was to get a NYT API key, construct an interface to R, grab some data and finally return a dataframe.  I chose to work with the "Archive_api" because I actually have some future tasks that I'd like to tackle that involve old newspapers.
+
+This file is available on rpubs [here](http://rpubs.com/plb_lttfer/375108) and in my github [here]()
+
+
+### Load the Libraries
+
+```{r, message=FALSE, warning=FALSE}
+
+library(jsonlite)
+library(httr)
+library(knitr)
+
+```
+
+
+### Build a function to Get JSON from NYT Archives API
+
+I created a function to query the NYT Archive API and return a dataframe containing the data retrieved.  Also, in the development process, I noticed that my request failed frequently so I've set my function up to retry using the RETRY() function.  
+
+```{r}
+
+#params
+api.key <- "36a5b43cb0e04a1dad5e23a9810f2cc1"
+yyyy <- "1929"
+mm <- "09"
+
+#return JSON from NYT API
+get.NytArchives <- function(api.key,yyyy,mm){
+  base.url <-  paste("https://api.nytimes.com/svc/archive/v1/",yyyy,"/",mm,".json",sep="")
+  print(paste("Collecting NYT archvies data for: ",toString(yyyy),"-",toString(mm)))
+  
+  #get seems to fail sometimes, so keep on tryin'
+  query <- RETRY("GET","https://api.nytimes.com/svc/archive/v1/1929/9.json",
+                 query = list(api_key=api.key),
+                 times = 100, 
+                 pause_base = 2)
+  query <- content(query,as="text",encoding="UTF-8")
+  
+  df <-  as.data.frame(fromJSON(query))
+  
+  #clean up the column names
+  colnames(df) <- gsub("^.*\\.","", colnames(df))
+  
+  return(df)
+}
+
+```
+
+### Test the Function
+
+We'll do a call to grab a single month and see what we get back
+
+```{r}
+
+result <- get.NytArchives(api.key,"1929","9")
+
+```
+
+
+
+### Check the Output
+
+And now we'll take a look and see what we got.  First i'll print the column names:  
+
+```{r}
+
+kable(colnames(result),col.names = "Column Names")
+```
+
+For output purposes, I'll select only a few of the columns listed above in order to keep things legible:
+
+```{r}
+kable(head(result[c("web_url","snippet")],5))
+
+```
+
+
+The data looks good!
+
+
+Now we're going to try and grab a bunch of data all at once:
+
+```{r}
+
+df <- data.frame(matrix(ncol = 2, nrow=0))
+
+colnames(df) <- c("web_url","snippet")
+
+for (i in 1:5){
+  data <- get.NytArchives(api.key,1929,i)
+  
+  df<- rbind(df,data[c("web_url","snippet")])
+}
+
+
+
+
+```
+
+
+We've just collected `r nrow(df)` articles from the NYT archives
+
