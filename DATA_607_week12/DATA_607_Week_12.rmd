@@ -1,0 +1,54 @@
+---
+title: "Data 607 - Week 12 - Recommender Systems"
+author: "Paul Britton"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+
+#LinkedIn - Job Recommendations
+
+Linkedin is one of the largest professional social networking sites in existence and as such it doubles as a place for recruiters to find talent and individuals to showcase their skills.  As I see it, there are two sides to the job-matching world, withch probably require distinct scenarion designs:  The Job Recommendations, and the Employee Recommendations.
+
+## Scenario Design
+
+### Job Recommendations
+I get emails from linkedin on a semi-regular basis givine me a heads-up on local jobs that may be a good fit for me.  Based on my experience as a "user" I think that the scenario design would look as follows:
+
+* Target users: Job Seekers
+* Key Goals: Finding new & interesting employment that is consistent with their skill-set and experience
+* How can We Help:  Make them aware of **relevant** opportunities in terms of skill-set, experience, geography, industry, etc.
+
+### Candidate Recommendations
+Although I've never used linkedin in a recruiting capacity, I would imagine that it is almost the flipside of the "job recommendations" objective.  Namely, to inform employers of candidates who match posted job-descriptions or who might otherwise be a good addition to their organizations.
+
+* Target users: Recruiters
+* Key Goals: Finding talent with the target skills and experience to fill desired roles.
+* How can We Help:  Facilitate matching of  **relevant** potential recruits to existing openings, and making recruiters aware of the matches.
+
+## Reverse Engineer
+
+Linkedin relies heavily on item-based (or item-to-item) collaborative filtering.  In very simple terms,  they make a "Browsemap" for each user which captures all of their activity, then they compare the Browsemaps of all users and look at the overlap/differences.  The intuition behind this is that there is wisdom in crowds (i.e. the more users that like something, the more valid that thing is) and that similar people like similar things.
+
+Apparently this system was originally intended for the specific task of recommending content on the basis of "people who viewed this profile also view ____", however, linkedin has expanded the framework to be more broad and generic.  Presumably there is information in everything people click on, not just in the individual profile associations.
+
+Read more about it in [this .pdf!]()
+
+Based on my personal (anecdotal) experience, my guess is that formal education / credentials are also given a heavy weight relative to these "Browsmaps" as I tend to get many recommendations that match my credentials, but not my experience, or clicking 
+
+As an aside, this could be because I live in a government town where formal credentials may matter more than experience... in which case the algo is working just fine.  Not sure how I would study this.)
+
+## Improvements
+
+From personal experience, I actually wish that Linkedin would rely more heavily on browsemaps.  As mentioned previously,  I get a lot of job suggestions that may line up with my formal credentials (some of which are 10 years stale by now!) but very little that lines up with my experience or with my contacts, or with what/who I tend to click on.
+
+Another thing I would change is that it appears as though they strive to provide a full list of ~20 jobs in each email.  Given my niche, most jobs aren't a match.  I'd prefer if they pruned the list to include only relevant jobs
+
+
+
