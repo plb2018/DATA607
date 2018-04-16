@@ -1,18 +1,26 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "DATA 607 - Project 4"
+author: "Paul Britton"
+output:  
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    toc: TRUE
 ---
+## Intro
+
+This rmd and all related input data can be found on my [github](https://github.com/plb2018/DATA607/tree/master/DATA_607_Project4).  This document can also be found on [rpubs](http://rpubs.com/plb_lttfer/380117)
 
 ## Clear the Workspace
 
-```{r}
+```{r clear_workspace}
 rm(list=ls())
 
 ```
 
 ## Load the Required Packages
 
-```{r message=FALSE,warning=FALSE}
+```{r setup, message=FALSE,warning=FALSE}
 library(tm)
 library(RTextTools)
 library(stringr)
@@ -24,11 +32,35 @@ library(tidyr)
 
 ## Load the Data
 
-We are going to look at spam data from from [http://spamassassin.apache.org/old/](http://spamassassin.apache.org/old/).  Given that the sample that we are using isn't all that big, we'll try using Vcorpus.  We'll load the "spam" and "ham" samples into variables, and then add meta-data denoting which is which.
+We are going to look at spam data from from [http://spamassassin.apache.org/old/publiccorpus/](http://spamassassin.apache.org/old/publiccorpus/).  Given that the sample that we are using isn't all that big, we'll try using Vcorpus.  We'll load the "spam" and "ham" samples into variables, and then add meta-data denoting which is which.
 
-```{r}
+## Set Ws
 
-basePath <- "C:/Users/Paul/OneDrive - CUNY School of Professional Studies/CUNY/DATA 607/Project 4/"
+```{r paths}
+basePath <- "C:/Users/Paul/OneDrive - CUNY School of Professional Studies/CUNY/DATA 607/DATA_607_Project 4/"
+
+setwd(basePath)
+```
+
+The data can be downloaded directly from R as follows and can then be extracted using the untar command, or external software.  For simplicity, I worked with a local copy of the data for this project, from the above local dir.
+
+
+```{r download, eval=FALSE}
+
+download.file("https://github.com/plb2018/DATA607/raw/master/DATA_607_Project4/20021010_easy_ham.tar", destfile = "20021010_easy_ham.tar")
+
+download.file("https://github.com/plb2018/DATA607/raw/master/DATA_607_Project4/20021010_spam.tar", destfile = "20021010_spam.tar")
+
+#untar("20021010_easy_ham.tar")
+#untar("20021010_spam.tar")
+
+```
+
+
+We load the data and add the spam tags:
+
+```{r load_and_tag}
+
 
 spam <- VCorpus(DirSource(paste(basePath,"spam/",sep=""),encoding="UTF-8"),
                readerControl = list(reader=readPlain))
@@ -43,9 +75,9 @@ meta(ham, tag = "is.Spam") <- "not_spam"
 
 ## Prepare the Data
 
-Next we'll combine the the data into a single VCorpus and clean it up a bit in preparation for conversion to a DocTermMatrix.  At this stage, I'm not going to perform any other cleaning/prep of the data because I'd like to assess the impact of it.
+Next we'll combine the the data into a single VCorpus and clean it up a bit in preparation for conversion to a DocTermMatrix.  At this stage, I'm not going to perform any other cleaning/prep of the data because I'd like to assess the impact of this step when we're further along.
 
-```{r}
+```{r prep1}
 
 
 ham.nSpam <- c(spam,ham,recursive=TRUE)
@@ -57,7 +89,7 @@ ham.nSpam <- tm_map(ham.nSpam,content_transformer(function(x) iconv(enc2utf8(x),
 
 Now we'll create the DTM.  Originally I had intended to run with the data as raw as possible for this initial attempt, however, some cleaning (as above) was required in order to get the DTM to create properly.  As a side note, it appears that one can use a DTM or a TDM with similar results, so long as you make sure that the dimensions are correct when creating the "container" in the next step. 
 
-```{r}
+```{r to_dtm}
 spam.dtm <- DocumentTermMatrix(ham.nSpam)
 spam.dtm
 
@@ -67,9 +99,9 @@ spam.dtm
 
 ```
 
-We can see above that the maximal term length is 515, which seems unrealistically high.  We'll explor that later - right now we'll create a vector with the true labels for training purposes.
+We can see above that the maximal term length is 515, which seems unrealistically high.  We'll explore that later - right now we'll create a vector with the true labels for training purposes.
 
-```{r}
+```{r create_labels}
 
 spam.label <- unlist(meta(ham.nSpam, "is.Spam")[,1])
 head(spam.label,5)
@@ -80,7 +112,7 @@ head(spam.label,5)
 
 Now we'll create the container that will be used to hold our training data and parameters.  
 
-```{r}
+```{r container}
 
 N <- length(spam.label)
 pct <-0.25
@@ -98,21 +130,10 @@ container <- create_container(
 
 Next, we'll train on the training set and then classify the test set. I'm going to start with just SVM as the point here it to demonstrate the capability.  Then we'll look at a few more things afterwards. 
 
-```{r}
+```{r model}
 
-#Train
 svm.model <- train_model(container, "SVM")
-#rf_model <- train_model(container, "RF")
-#maxent_model <- train_model(container, "MAXENT")
-
-#model <- train_model(container, algorithm="RF") 
-
-#Classifying data
 svm.out <- classify_model(container, svm.model)
-#rf_out <- classify_model(container, rf_model)
-#maxent_out <- classify_model(container, maxent_model)
-
-#result <- classify_model(container, svm_model)
 
 kable(head(svm.out,10))
 ```
@@ -126,6 +147,8 @@ predicted.labels <- svm.out[,"SVM_LABEL"]
 recall_accuracy(true.labels,predicted.labels)
 
 ```
+
+Not bad at all!
 
 
 ## Cleaning Up the Data
@@ -142,9 +165,7 @@ We'll now take a look at what happens if we run the same analysis on data that w
 ```{r}
 
 clean.spam <- ham.nSpam
-
 clean.spam <- tm_map(clean.spam,content_transformer(tolower),lazy=TRUE)
-
 clean.spam <- tm_map(clean.spam,removePunctuation)
 clean.spam <- tm_map(clean.spam,removeNumbers)
 clean.spam <- tm_map(clean.spam,removeWords,words=stopwords("en"))
@@ -153,14 +174,12 @@ clean.spam <- tm_map(clean.spam,stemDocument,lazy=TRUE)
 
 clean.spam <- tm_map(clean.spam ,content_transformer(function(x) iconv(enc2utf8(x), sub = "byte")))
 
-
-
 clean.dtm <- DocumentTermMatrix(clean.spam)
-
 clean.dtm <- removeSparseTerms(clean.dtm,0.95)
-
 clean.dtm
 ```
+
+# Testing With the Clean Data
 
 We've cleaned the data and reduced the sparsity of the DTM a little bit.  The maximal term length is down by about 90% from the uncleaned data.  Now We'll check which produces better results.  We'll write a little function to train the model and assess the output on a random sample of the data, and then run a few iterations:
 
@@ -193,6 +212,7 @@ modelTest <- function(sampleSize, test_prop, corpus){
 }
 ```
 
+We'll wrap the function in a loop and see whether we get better results for the "original" or the "clean" data.
 
 ```{r}
 itr <-25
@@ -201,7 +221,7 @@ clean <- rep(0,itr)
 
 
 for (i in 1:itr){
-  print(i)
+  #print(i)
   orig[i] <- modelTest(100,0.25,ham.nSpam) 
   clean[i] <- modelTest(100,0.25,clean.spam) 
   
@@ -213,44 +233,66 @@ for (i in 1:itr){
 The above is painfully slow and i assume that there is a much better way to accomplish similar this task.  However, in this case, we've gotten the desired data.
 
 ```{r}
-
-
 data <- data.frame(orig=orig,clean=clean)
-
 summary(data)
-
 tidy.data <- gather(data)
-
 ggplot(tidy.data,aes(x=value,fill=key)) + geom_histogram(alpha=0.75,bins=10)
 
 ```
 
 For this particular task, the original (uncleaned) doesn't appear to produce results that are significantly different from the "clean" data, at least on an SVM model.
 
+# Multi-Model
+
+Finally, we'll look at a few different methods for training our models.  I've chosen a few and down-scoped the data a little bit as otherwise, this step takes *forever* to run.
 
 
+```{r container2}
 
-```{r}
+#downsample the data
+clean.spam <- sample(clean.spam,500)
+clean.dtm <- DocumentTermMatrix(clean.spam)
+clean.dtm <- removeSparseTerms(clean.dtm,0.95)
+spam.label <- unlist(meta(clean.spam, "is.Spam")[,1])
 
-#Train
+N <- length(spam.label)
+pct <-0.25
+r <- round(N*pct,0)
+
+container <- create_container(
+  spam.dtm,
+  labels = spam.label,
+  trainSize = 1:r,
+  testSize = (r+1):N,
+  virgin=FALSE)
+
+```
+
+
+We'll train and run using 3 different algorithms:
+
+```{r multi-model}
+
 multi.model <- train_models(container, algorithm=c("SVM","RF","MAXENT"))
-
 multi.out <- classify_models(container, multi.model)
+```
 
+```{r show_multi}
 kable(head(multi.out,10))
 
 ```
 
-```{r}
+```{r multi_plot}
 
 true.labels <- as.numeric(as.factor(spam.label[(r+1):N]))
-predicted.labels <- svm.out[,"SVM_LABEL"]
+
+predicted.labels <- multi.out[,"SVM_LABEL"]
 svm <- recall_accuracy(true.labels,predicted.labels)
 
-predicted.labels <- svm.out[,"FORESTS_LABEL"]
+predicted.labels <- multi.out[,"FORESTS_LABEL"]
 rf <- recall_accuracy(true.labels,predicted.labels)
 
-predicted.labels <- svm.out[,"MAXENTROPY_LABEL"]
+predicted.labels <- multi.out[,"MAXENTROPY_LABEL"]
 maxent <- recall_accuracy(true.labels,predicted.labels)
 
 results <- data.frame(svm=svm,rf=rf,maxent=maxent)
@@ -259,7 +301,7 @@ tidy.results <- gather(results)
 
 ggplot(tidy.results,aes(x=key, y=value,fill=key)) + 
   geom_bar(stat="identity") +
-  coord_cartesian(ylim = c(0.975, 1.00))+
+  coord_cartesian(ylim = c(min(results)*0.95, max(results)*1.05))+
   xlab("Model")+
   ylab("Success Rate")+
   ggtitle("Prediction Success Rate for Various Methods")+
