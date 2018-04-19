@@ -1,0 +1,52 @@
+---
+title: "DATA 607 Project Proposal"
+author: "Paul Britton"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    toc: yes
+---
+
+
+# Final Project Proposal
+
+## Task 
+
+### Big Task
+
+My end-goal is to extract futures quotes from old (pre-1930s) newspaper data.  There is an abundance of free/public-domain newspaper available from various sources.  I think that may be too big a task for this project (quick inspection suggesta that the OCR data is not that good in some places!).  So I'll settle on an immediate task: 
+
+### Immediate task
+
+My immediate task (i.e. for this project) is to build a model to identify which newspaper pages are likely to contain the data that I care about.  I figure that the data set I'm looking at contains > 10M pages and that the data I'm interested in is likely confined to < 1% of them. 
+
+### Motivation
+
+My motivation is three-fold:
+ 
+* I'm interested in financial market history, particularly old, obscure data sets.  This data set is rich and provides ample opportunities for cross-validation and error checking (i.e. multiple papers should report the same data-points every day... we'll see...)
+* I'm interested in learning more about text processing.  I found project four extremely interesting and I'd like to build on the momentum that I feel I have right now.
+* I think that there are a lot more interesting things that could be done with the proposed data set in the future and as such, my intention is to become more familiar with it.
+
+## Data
+
+I intend to use data from The Library of Congress [Chronicling America](https://chroniclingamerica.loc.gov/) project.  Specifically, I'm going to use the [API](https://chroniclingamerica.loc.gov/about/api/) to collect  bulk samples.  They have hi-res images, OCR and XML data available.  I'll use the OCR for certain, possibly the XML, and in a cursory way, the images. 
+
+## Methods
+
+1. Write code to grab data from the API 
+
+2. Manually tag a sample of .txt documents (a few 100 maybe) as "containing" or "not containing" the data of interest.  This will facilitate the supervised learning approach which will be my primary plan of attack.  I will, however,  likely look into unsupervised methods as part of the process as well.
+
+3. Train and tune a model to detect pages of interest.  I suspect that this is where much of the work wil lie as the OCR data is messy.  As an example here's an image from the  [1861 New York Herald](https://chroniclingamerica.loc.gov/lccn/sn83030313/1861-12-11/ed-1/seq-2/) and here is the corresponding [text file](https://chroniclingamerica.loc.gov/lccn/sn83030313/1861-12-11/ed-1/seq-2/ocr/).  The ORC process really seems to struggle with the 150 year old printing press output!  
+
+4. Use the model to identify which papers I can ignore entirely (not all of them have financial data)
+
+5. For the relevant papers (i.e. those not ignored), try to identify which page(s) contain the relevant info such that I have at least 1 observation per business day.
+
+6. Download images for all pages identified and visually confirm that I got what I wanted.
+
+
+
