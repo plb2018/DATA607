@@ -1,0 +1,173 @@
+---
+title: "DATA 607 - WEEK 13 Assignment"
+author: "Paul Britton"
+output:
+  html_document:
+    highlight: pygments
+    theme: cerulean
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+The task here is to migrate from an SQL database to a NoSQL database.  I decided to recycle my movie data from week 2 and move it over to mongoDB.
+
+All the relevant data for this work can be found on github [here](https://github.com/plb2018/DATA607/tree/master/DATA_607_week13) and the output can be found on rpubs [here](http://rpubs.com/plb_lttfer/384542)
+
+
+## Clean-up and Setup 
+
+```{r, echo=FALSE}
+rm(list = ls())
+```
+
+```{r setup}
+
+library(RMySQL)
+library(mongolite)
+library(stringr)
+library(miniUI)
+library(shiny)
+library(knitr)
+```
+
+## Create the SQL Tables
+
+### User Password
+I've borrowed an awesome snippet that was posted on Slack as a much nicer way allow for users to input passwords.
+
+```{r password, message=FALSE,warning=FALSE}
+#a shout out to Justin for posting this awesome snippet on slack!
+
+get_password <- function() {
+ ui <- miniPage(
+   gadgetTitleBar("Please enter password for database: data_607 "),
+   miniContentPanel(
+     passwordInput("password", "")
+   )
+ )
+
+ server <- function(input, output) {
+   observeEvent(input$done, {
+     stopApp(input$password)
+   })
+   observeEvent(input$cancel, {
+     stopApp(stop("No password.", call. = FALSE))
+   })
+ }
+
+ runGadget(ui, server, viewer = dialogViewer("Password", height = 200))
+}
+
+pw <- get_password()  
+
+```
+
+### The SQL data
+
+In the interest of reproducibility, I'm going to create the mysql db right here.  The only action that the user would need to perform in order to make this code work is to create a mysql database entitled *data_607*.
+
+
+```{r mysql_db, messages = FALSE}
+
+#connect to the 
+con = dbConnect(MySQL(),
+                user="root",
+                password=pw,
+                dbname='DATA_607',
+                host='localhost')
+
+#load the data
+ratings <- read.table("https://raw.githubusercontent.com/plb2018/DATA607/master/ml-latest-small/ratings.csv",header = TRUE, sep = ",",quote = "\"")
+
+movies <- read.table("https://raw.githubusercontent.com/plb2018/DATA607/master/ml-latest-small/movies.csv",header = TRUE, sep = ",",fill = TRUE,quote = "\"")
+
+#create tables from the data
+dbWriteTable(con, name='ratings', value=ratings, overwrite=TRUE)
+dbWriteTable(con, name='movies', value=movies, overwrite=TRUE)
+
+#join the data into a third table
+dbSendQuery(con, "CREATE TABLE IF NOT EXISTS movie_ratings AS (
+SELECT  movies.movieId,ratings.userId, ratings.rating, movies.title,movies.genres
+FROM movies
+INNER JOIN ratings ON  movies.movieId = ratings.movieId);")
+
+
+
+```
+
+## Migrate to Mongo
+
+From what I gather, there are a few ways to migrate from SQL to NoSQL, however, it seems to be highly dependent on the input SQL DB and the desired outcome.  In the case of my movie DB, the requirements are pretty simple, so i decided to try 2 methods of migration.
+
+### Method 1 - CSV
+
+A common method seems to be using CSV as a go-between.  It appears as though this method offers good versatility, however, it's probably slow and impractival for extremely large databases.
+
+First I write my SQL tables to files 
+
+```{r to_csv}
+
+sql.tables <- dbListTables(con)
+
+for (i in 1:length(sql.tables)){
+  data<- dbReadTable(con,sql.tables[i])
+  write.table(data,
+              paste(sql.tables[i],".csv",sep=""),
+              row.names=FALSE,
+              sep=",")
+}
+
+```
+
+For the ease of the user, I've put the output from the above on github, and I'll work from that source.  We load 1000 rows of the DB from github back into R
+
+```{r from_csv}
+
+movie.ratings <- read.table("https://github.com/plb2018/DATA607/raw/master/DATA_607_week13/movie_ratings.csv",sep=",",header=TRUE, nrows=1000)
+
+```
+
+Then we connect to mongo and add the data.  Note that we assume that the user here already has a local copy of mongo running which contains a db called "DATA_607" and a collection called "movies"
+
+```{r to_mongo1}
+mongo <- mongo(db="DATA_607",collection="movies")
+mongo$insert(movie.ratings)
+
+```
+
+Now we check and see what's in the new mongo db:
+
+```{r mongo_check1}
+kable(mongo$find(
+  query = '{"rating" : {"$gte" : 5}}', 
+  fields = '{"title":true, "rating":true}',
+  limit = 10)
+  )
+```
+ 
+ The data looks good!
+
+
+
+### Method 2 - Right from MySQL
+
+Another way, which it appears to be less feasible for complicated SQL DBs is to just go directly from a SQL query into mongo.  Here we're really only loading 1 table, so it's not a big deal, but i'm less confident that this will work for complicated DBs.
+
+```{r to_mongo2}
+
+movie.ratings <- dbReadTable(con,"movie_ratings")
+mongo <- mongo(db="DATA_607",collection="movies2")
+mongo$insert(movie.ratings)
+```
+
+```{r mongo_check2}
+kable(mongo$find(
+  query = '{"rating" : {"$gte" : 5}}', 
+  fields = '{"title":true, "rating":true}',
+  limit = 10)
+  )
+```
+
+
+The data looks good here too! 
