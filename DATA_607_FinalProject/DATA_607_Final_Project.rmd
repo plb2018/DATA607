@@ -1,0 +1,617 @@
+---
+title: "DATA 607 - Final Project"
+author: "Paul Britton"
+output:  
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    toc: TRUE
+---
+
+
+# Project Overview
+
+For this project, I'm attempting to classify documents from the Library of Congress's [Chronicling America](https://chroniclingamerica.loc.gov/) initiative as either containing specific financial data, or not.  I have several goals for this project:
+
+1. Classify pages (and thus newpapers) according to whether or not they contain specific financial content
+2. Familiarize myself with this data set with a goal to facilitate future work.  There is A LOT of interesting stuff that could be done here 
+3. Improve my text-mining skills
+
+
+All of work assodicated with this project can be found in my [github](https://github.com/plb2018/DATA607/tree/master/DATA_607_FinalProject) including some sample data.  The output itself can be found on [rpubs](http://rpubs.com/plb_lttfer/388909)  Given the size and location of the data set that I used, I have decided to provide tools that allow any user to collect them from the source themselves.  The Library of Congress seems committed to maintaining availability of data so I don't have any concerns here regarding reproducibility. 
+
+
+## About the Data
+
+Chronicling America currently has about 13.3M pages archived and seems to be continually expanding their data set.  The data is available in a few formats: 
+
+* [Images](https://chroniclingamerica.loc.gov/lccn/sn83025287/1883-12-29/ed-1/seq-7/).  They can also be downloaded as hi-res .jp2 files.
+* [Text](https://chroniclingamerica.loc.gov/lccn/sn83025287/1883-12-29/ed-1/seq-7/ocr/).  This was created using [OCR](https://chroniclingamerica.loc.gov/ocr/) and thus is far from perfect, especially for older or messier newspapers.
+* [XML](https://github.com/plb2018/DATA607/raw/master/DATA_607_FinalProject/ocr.xml).  The XML appears to be an enriched version of the OCR which contains word coordinates within the page, OCR confidence scores.  Probably beyond the scope of this project, but something that I hope to work with in the future to automate the extraction of data.   
+
+
+I estimate that it takes me about 10 seconds to manually load and visually scan a page for content of interest, so it would take about 154 days (working 24/7) to scan all the pages manually.  I also roughly estimate that only about 0.5%  of pages contain content that is relevant in the context of this project. 
+
+A few examples of the kind of data that we're looking for here; both images and corresponding OCR data.
+
+Daily price quotes for various futures markets:
+
+### Example 1
+
+#### Image
+
+![Daily Futures Quotes - Circa Dec 29, 1883](https://github.com/plb2018/DATA607/raw/master/DATA_607_FinalProject/images/futures_sample.PNG)
+
+#### OCR:
+
+```
+COMMISSION MERCHANTS,
+Boom 4, Mann helper Building, Southeast comer
+Third and Minnesota street?. Direct wire to
+Chicago and Milwaukee Boards of Trad*.
+(Operator is our office.)
+Bt. Paul, Friday, Dec. 23, 1833.
+Following is to-day's rango of prices on the
+Milwaukee and Chicago boards:
+???""">" ! I I I ' fit
+1 w a I- s S s
+I a ? ? f 111
+: ? : . : c 3 :
+Milwaukee, j
+Wheat- "
+January.... 95 i 94% S5Ji Si% 94%' 92%
+February... 96% 95& Oo^'i 95% S5& 98%
+May 1C3% 103% 103% 108% ....
+Chicago,
+Wheat-
+January.... S6>i 95%' 96% Sssi 36 92%
+February.. 97% 98% 91% S6s£ 96% 93 %
+March ;
+May 1G4% 1C8& 10*34 1«3% ICS^ »5f
+```
+
+### Example 2
+
+#### Image
+
+Hourly Price quotes for various futures market:
+
+![Hourly Futures Quotes - Circa Dec 29, 1883](https://github.com/plb2018/DATA607/raw/master/DATA_607_FinalProject/images/futures_sample2.PNG)
+
+
+#### OCR
+```
+The following quotations, glrti tt the r>n^« of
+the 2&rkets durissthe day, wars nesi - by XL.
+Doran, Co2tj»ion Merchant:
+. WHEAT.
+Jan. May. Jaa. Kay.
+9-10 A.M. 84% 10SH SSK- 103Ji
+9^5 - t4si lOS-^. 9JJi 108H
+10:00 " 95 103 V toft lUSK
+10a5 " 85 IC3S B*£ 104 V
+10*0 M 95 X 108% 96 IMU
+LQAi " 85# 113 % 91)? 104 %
+11*0 ??? 95 10J% H¥ 10: V
+11:15 " . 95 l«»i 9»« 104
+11*) " 95 10»»i »5% 10SK
+HHa " .84% 108* 95% 199%
+13.-0O " 95 108% 86 104
+12:15 " »5 ~?????? 103% 96^ 104^
+11:10 M t*% 1C3% 96% K-4 j
+1345 " 84« 103%- C-6 10S5<
+IsOQ " 84% ' l'J3% 86 ltSXj
+```
+
+
+As can be seen from the above, the quality of the OCR leaves something to be desired.  My hope here is that, despite the translation being either incorrect or totally illegible to humans, there are still enough similarities between financial pages for them to be grouped together and that they are distinct from non-financial pages.
+
+
+
+```{r cleanup}
+rm(list = ls())
+```
+
+```{r setup, warning=FALSE, message=FALSE}
+library(jsonlite)
+library(data.tree)
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(tm)
+library(qdap)
+library(ggplot2)
+library(httr)
+library(RTextTools)
+library(knitr)
+
+```
+
+
+## Collect the Data Dictionary
+
+Chronicling America provides a well organized data dictionary and bulk-downloading facility.  The first thing that we'll do is get a list of files to download.
+
+```{r get_data_list}
+url <- "http://chroniclingamerica.loc.gov/ocr.json"
+ocr <- fromJSON(url)
+ocr <- data.frame(ocr['ocr'])
+
+kable(head(select(ocr,ocr.url,ocr.size),5))
+```
+
+## Download the Data
+
+The list above looks usable so now we can proceed to downloading some data.  Note that some of these files are pretty large (1GB compressed) so I've included a "test" mode in my download function that grabs the 5 smallest files.  Data is downloaded to CWD unless otherwise specified
+
+
+```{r download, eval = FALSE}
+getArchives <- function(ocr.df,outPath = NULL, testMode = TRUE){
+  if(testMode){ocr.df<- head(ocr.df[order(ocr.df$ocr.size),],5)}
+
+  for (row in 1:nrow(ocr.df)){
+    data.url <- as.character(ocr.df[row,"ocr.url"])
+    print(paste("Downloading: ",data.url),sep=" ")
+    download.file(data.url,
+      destfile=paste(outPath,
+      tail(unlist(strsplit(data.url,"\\/")),1)))
+    }
+}
+
+
+#if testMode = True, the function only downloads the smallest file
+getArchives(ocr,testMode=TRUE)
+
+#if testMode = False the function download everything.  Takes forever!
+#getArchives(ocr,testMode=FALSE)
+
+
+```
+
+
+## Uncompressing
+
+Once the data is downloaded, it will need to be manually unzipped from .bz2 format.  While R seems to have good support for bz2, I couldn't seem to get it to work seamlessly with .tar.bz2 files containing a large tree-structure within. 
+
+After we have unzipped, we can untar the rest as below.  Note that given some of the file sizes, this can take a while to run, so I've included a sample unzip from github.  Note that these files contain both .txt and .xml, but no images.
+
+
+```{r uncompress, eval=FALSE}
+
+#I saved some small sample files on my github for demonstration purposes
+untar("https://github.com/plb2018/DATA607/blob/master/DATA_607_FinalProject/sampleData/batch_in_alford_ver01.tar",
+      compressed = "bzip2",
+      exdir = "test")
+
+
+#A local file that i was working with
+#untar("batch_mnhi_anoka_ver02.tar",
+#      compressed = "bzip2",
+#      exdir = "test")
+
+
+```
+
+
+## Inspect
+
+Let's take a look at the file structure contained within the compressed files.
+
+```{r inspect, eval=TRUE}
+path <- list.dirs("test/paper_name")
+
+files.tree <- data.tree::as.Node(data.frame(pathString = path))
+
+files.tree
+```
+
+
+We see that basically, ever paper,year, month, day, edition and page gets its own folder.  This means that we have to crawl these paths to get to all the actual files.  I'm tempted to sidestep this file structure by saving all the files in a single directory and encoding the files names with the same info as provided by the dir tree... but we won't do that right now.
+
+## Get the Files
+
+We'll get a list of all the files within the tree structure
+
+```{r, getFiles}
+
+ocr.names <- list.files("test/cat/sn83025287",
+           full.names = T,
+           recursive = T)
+
+ocr.names <- as.data.frame(ocr.names,
+                           stringsAsFactors = FALSE)
+
+
+kable(head(ocr.names,6))
+```
+
+
+## Transform
+
+Now we'll transform the data.  Essentially, I'm going to chop up the file-paths and put all that data into a df to be used as meta-data in my corpus further along.  We'll concatenate the year, month and day into a proper date, add a column that contains the day of the week (potentially useful in finance) and a column to flag whether the document contains financial data or not.
+
+It's also a logical place to separate the .txt and .xml files at this point.
+
+
+```{r, transform}
+
+new.cols <- c("rootfolder","cat","id","YYYY","mm","dd","edition","pageNum","fname") 
+
+
+ocr.names %>%
+  filter(str_detect(ocr.names,".txt")) %>%
+  separate(ocr.names,
+           ocr.names,
+           into=new.cols,
+           sep="/",
+           remove=F,
+           convert=F,
+           extra="warn",
+           fill="warn")-> ocr.txt
+
+ocr.names %>%
+  filter(str_detect(ocr.names,".xml")) %>%
+  separate(ocr.names,
+           ocr.names,
+           into=new.cols,
+           sep="/",
+           remove=F,
+           convert=F,
+           extra="warn",
+           fill="warn")-> ocr.xml
+
+
+
+ocr.txt$edition <- gsub("ed-","",ocr.txt$edition)
+ocr.txt$pageNum <- gsub("seq-","",ocr.txt$pageNum)
+ocr.txt$date <- with(ocr.txt, ymd(sprintf('%04s%02s%02s', YYYY, mm, dd)))
+ocr.txt$wDay <- wday(ocr.txt$date,label=T)
+ocr.txt$hasData <- "0"   
+ocr.txt$text <- ""
+colnames(ocr.txt)[1] <- "doc_id"
+
+kable(head(ocr.txt,5))
+
+
+
+
+```
+
+
+## Build a Corpus
+
+Next we'll take the dataframe that we've just created and add the actual text content from the files.  Once again, this can take a while.
+
+```{r, corpus}
+
+ocr.txt$text <- sapply(ocr.txt$doc_id, readChar,nchars=99999999)
+ocr.corpus <- Corpus(DataframeSource(ocr.txt))
+
+#we'll add the doc_id as meta just in case we need it for some reason...
+meta(ocr.corpus,tag="doc_id") <-ocr.txt$doc_id
+
+kable(head(meta(ocr.corpus),5))
+
+```
+
+
+## Bag O' Words... (or something like it)
+
+Now we're going to employ a "bag of words" like method to pare down the data for manual classification. 
+
+One of the problems that I face is that I need a sample of classified documents in order to train the SVM process that I'm planning on applying here.  My idea is to short-list the docs using a bag-of-words approach and then manually classify.
+
+Cursory inspection tells me that certain words are more common within target pages than non-target pages.  What I do here is remove everything but those relevant words and work with that (significantly reduced) output.  This speeds things up a lot.
+
+```{r, bagOwords}
+
+
+keepWords<-content_transformer(function(x,words) {
+    regmatches(x, 
+        gregexpr(paste0("\\b(",  paste(words,collapse="|"),"\\b)"), x)
+    , invert=T)<-" "
+    x
+})
+
+keep<-c("oats","corn","bushel","wheat","rye","barley")
+
+
+bagOwords.corpus <- ocr.corpus %>%
+  tm_map(content_transformer(tolower)) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removeWords,words=stopwords("english")) %>%
+  tm_map(stripWhitespace) %>%
+  tm_map(stemDocument,language = "english") %>%
+  tm_map(keepWords,keep)
+  
+
+ocr.dtm <- DocumentTermMatrix(bagOwords.corpus)
+
+```
+
+Now I subset all the documents that contain an abundance of my "keep" words.  All I did here was make a simple rule that picks out documents that contain > 75 occurences of the special words.  In hindsight, I probably should have used a proportion rather than an absolute number, but I suspect that the number of words on a newspaper page is relatively constant for both business & practical reasons, so a hard limit probably isn't all that dangerous.
+
+
+
+```{r, moreWords}
+t <- as.data.frame(as.matrix(ocr.dtm),stringsAsFactors = F)
+t$sum <- rowSums(t)
+
+target <- meta(ocr.corpus[which(t$sum >70)],tag="doc_id")
+
+kable(head(target,5))
+
+ggplot(t,aes(x=seq(1, nrow(t), by=1),y=t$sum)) + 
+  geom_line() +
+  ylab("Important Term Freq") +
+  xlab("Doc Num") +
+  ggtitle("Term Count by Doc")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+qplot(t$sum, geom="histogram") + 
+  xlab("Important Term Freq") +
+  ggtitle("Term Count Freq")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+We can see that most of the documents contain <25 occurrences of the "keep" words but that there is a bit of a jump around the 75-count mark.  To be clear, my intention with this  "bag of words"  approach is to identify documents that have a higher probability of containing financial data for manual classification, but I'm not overly concerned with being wrong.
+
+
+#Get Images
+
+So we've identified a handful of files that contain relevant words.  Next we're going to download images (.pdfs) so that we can manually inspect and classify them.  Once again, even the .pdfs are about 5mb each, so this takes a while.
+
+We basically parse the file names to reconstruct the image URL at Chronicling America.
+
+```{r, getImages, eval=FALSE}
+
+#the base URL 
+image.base <- "https://chroniclingamerica.loc.gov/lccn/"
+
+for (i in unlist(target)){
+  
+  str <- unlist(strsplit(i,split='/'))
+  dt <- paste(str[[3]],str[[4]],str[[5]],sep="-")
+  fname <- paste(str[7],".pdf",sep="")
+  img.url <- paste(str[2],dt,str[6],fname,sep="/")
+  
+  
+  #print(paste(image.base,img.url,sep=""))
+  
+  #i've commented this out so i don't accidentally end up downloading tons of images
+  #GET(paste(image.base,img.url,sep=""),
+  # write_disk(paste("test/images/",gsub("/","_",img.url),sep=""),overwrite=F))
+  
+} 
+
+```
+
+
+# Add Classifiaction Info
+
+So I've manually classified about 220 documents and that information can now be added to the corpus.  We'll use the "hasData" meta-tag that we previously created when transforming the data. 
+
+For the manual classification, rather than classifying every document as either "TRUE" or "FALSE", I've created a list that contains documents for which my condition is "TRUE".  On a date-by-date basis, this is valid as newspapers (particularly of this vintage) generally have futures quotes confined to one single page per date.  
+
+We go through my manually classified items; a simple text file containing paper id, date and page num.  We identify the index for each id+date+pageNum combo in the corpus, and then change that flag from from FALSE to TRUE.
+
+
+```{r, addFlagInfo, warning=FALSE}
+
+flags <- read.csv("https://raw.githubusercontent.com/plb2018/DATA607/master/DATA_607_FinalProject/market_data.txt",header = T, stringsAsFactors = F)
+
+#create a list to store our updated info
+hasData <- rep(FALSE,nrow(meta(ocr.corpus)))
+
+for (f in 1:nrow(flags)){
+  
+  id <- ymd(flags[f,1])
+  dt <- flags[f,2]
+  pg <- flags[f,3]
+  
+  #print(paste(id,dt,pg))
+  
+  idx_id <- (meta(ocr.corpus,tag = "id") == "sn83025287")
+  idx_dt <- (meta(ocr.corpus,tag = "date") == dt)
+  idx_pg <- (meta(ocr.corpus,tag = "pageNum") == pg)
+
+  #idx <- data.frame(id=idx_id,dt=idx_dt,pg=idx_pg)
+  idx <- data.frame(dt=idx_dt,pg=idx_pg)
+
+  idx <- rowSums(idx) == 2
+
+  #meta(ocr.corpus[idx],tag="hasData") <-1
+  
+  hasData[idx] <- TRUE
+  
+  
+}
+
+#update our corpus classification
+meta(ocr.corpus,tag="hasData") <-hasData
+
+kable(head(meta(ocr.corpus,tag="hasData"),5))
+
+```
+
+
+# Build a Model
+
+Now that we have some classified data, we can build a model.  Recall that previously we'd used a stripped down version of the corpus.  Here, we're going to revert back to the original, full corpus.
+
+We'll start by cleaning the original corpus.  Then we'll build a container for the SVM.
+
+```{r container}
+
+ocr.corpus <- ocr.corpus %>%
+  tm_map(content_transformer(tolower)) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removeWords,words=stopwords("english")) %>%
+  tm_map(stripWhitespace) %>%
+  tm_map(stemDocument,language = "english")
+
+
+#down sample for testing
+data <- sample(ocr.corpus,2500) 
+ocr.dtm <- DocumentTermMatrix(data)
+
+#setup for building our container
+labels <- unlist(meta(data, "hasData")[,1])
+N <- length(unlist(meta(data, "hasData")[,1]))
+pct <-0.80
+r<-round(N*pct,0)
+
+
+
+container <- create_container(
+  ocr.dtm,
+  labels = labels,
+  trainSize = 1:r,
+  testSize = (r+1):N,
+  virgin=FALSE)
+
+```
+
+## Train the  Model
+
+Next we'll train the actual model on some data.  I've chosen SVM as it appears to be a reasonable approach for problems with high dimensionality, which this is.
+
+```{r SVM}
+
+svm.model <- train_model(container, "SVM")
+svm.out <- classify_model(container, svm.model)
+
+
+```
+
+## Inspect the Model
+
+Now we examine the results of the model.  Below we see a table with all of the predicted values alongside the real TRUE values.  I think it's a good way to show the data as the real TRUE observations are few relative to the whole sample.
+
+We also look at the accuracy using the "recall_accuracy()" function.  In this case, I think that this function provides a misleading result.  Given that I expect only about 0.5% of docs to contain info that I am interested in, and that all my docs are pre-coded as false, we'd expect to get a high score here.  I'm much more concerned with the proportion of TRUE documents that I was able to identify as such.
+
+```{r SVM_out}
+
+true.labels <- labels[(r+1):N]
+predicted.labels <- svm.out[,"SVM_LABEL"]
+svm.out$real <- true.labels 
+
+kable(head(svm.out[svm.out$real == TRUE,],20))
+
+recall_accuracy(true.labels,predicted.labels)
+
+length(which(predicted.labels == TRUE & true.labels == TRUE)) / length(which(true.labels ))  
+
+```
+
+So the model appears to be able to do a reasonable job of classifying which documents meet my criteria and which do not.  I find this impressive given that the training set is relatively small and that the documents are so messy.
+
+
+## Outsample Attempt
+
+Finally, we'll try to apply the model that we've just trained on some outsample data and take a quick look at the results.
+
+We'll start by loading up some uncategorized data and formatting it.
+
+```{r, outsample}
+
+#load uncategorized data
+uncat.names <- list.files("test/uncat/sn83025287",
+           full.names = T,
+           recursive = T)
+
+uncat.names <- as.data.frame(uncat.names,
+                           stringsAsFactors = FALSE)
+
+
+
+uncat.names %>%
+  filter(str_detect(uncat.names,".txt")) %>%
+  separate(uncat.names,
+           uncat.names,
+           into=new.cols,
+           sep="/",
+           remove=F,
+           convert=F,
+           extra="warn",
+           fill="warn")-> uncat.txt
+
+uncat.txt$edition <- gsub("ed-","",uncat.txt$edition)
+uncat.txt$pageNum <- gsub("seq-","",uncat.txt$pageNum)
+uncat.txt$date <- with(uncat.txt, ymd(sprintf('%04s%02s%02s', YYYY, mm, dd)))
+uncat.txt$wDay <- wday(uncat.txt$date,label=T)
+uncat.txt$hasData <- FALSE   
+uncat.txt$text <- ""
+colnames(uncat.txt)[1] <- "doc_id"
+
+
+uncat.txt <- tail(uncat.txt,50)
+
+uncat.txt$text <- sapply(uncat.txt$doc_id, readChar,nchars=99999999)
+uncat.corpus <- Corpus(DataframeSource(uncat.txt))
+
+
+```
+
+
+We'll then create a dtm.  Note that a slightly different method is required here as model appears to be picky about inputs.  As such, I had to give it some info about the matrix originally used to train the model.
+
+```{r, outsample2}
+
+uncat.labels <- unlist(meta(uncat.corpus, "hasData")[,1])
+
+#IMPORTANT NOTE:  the create_matrix function seems to throw an error only when knitting.
+#This is an ugly (but effective) fix.  When running, an edit window will pop-up.  
+#Change "Acronym" to "acronym" in line ~42 and it work.  Obscure, yet effective.
+
+trace("create_matrix", edit=T)
+
+dtm <- create_matrix(uncat.txt,
+                     originalMatrix=ocr.dtm,
+                     toLower = TRUE,
+                     removePunctuation = TRUE,
+                     removeNumbers=TRUE,
+                     removeStopwords = TRUE ,
+                     stemWords  = TRUE)
+```
+
+We then create the container and run the model
+
+```{r, predict}
+
+uncat.container <- create_container(
+  dtm,
+  labels = labels,
+  testSize = 1:50,
+  virgin=FALSE)
+
+
+uncat.out <- classify_model(uncat.container,svm.model)
+
+kable(head(uncat.out,10))
+
+uncat.out[uncat.out$SVM_LABEL == TRUE,]
+
+```
+
+We see that according to the model, none of the 50 out-sample pages appear to have any data of interest.  A cursory investigation of the associated image files suggests that this is reasonably, although not perfectly accurate.  Either way, my suspicion is that the model needs a larger training set, and I intend to continue working on that.
+
+# Summary
+
+In this project, I was able to
+
+1. Acquire and unpack the desired data
+2. Manipulate and transform the data
+3. Significantly reduce manual efforts using "bag of words", including automated download of image files for manual inspection
+4. Manually classify, then automatically tag the data
+5. Build an SVM model, which was surprisingly accurate based on the input / intuition
+6. Run the model on totally "out of sample" data.
+
+
+# Future Work
+
+I intend to continue to explore this model and the data set in general.  Once I have located a significant number of pages which contain the content that I am interested in, I plan to take a crack at automatic extraction of that data.
